@@ -1,0 +1,70 @@
+PASTA DE SPRITES / ASSETS
+=========================
+
+O jogo roda SEM nenhum arquivo aqui dentro: quando um sprite nao e encontrado,
+o codigo gera um placeholder (ate animado) automaticamente. Para usar arte de
+verdade, basta soltar os arquivos .png com os nomes abaixo - o jogo passa a
+usa-los sozinho, sem mexer no codigo.
+
+(Atalho: para o pacote Pixel Adventure, use o importar_sprites.py desta pasta.)
+
+REGRAS GERAIS (importante pra ficar bonito)
+-------------------------------------------
+- Estilo: pegue tudo de UM pacote so (mesma paleta/resolucao). Misturar estilos
+  e o que mais deixa pixel art feio.
+- Resolucao ~16px (o jogo desenha em 480x270). Evite sprites de 64px.
+- Os sprites sao ESCALADOS automaticamente pra altura certa, entao a arte de
+  origem nao precisa ter o pixel exato.
+- Fundo TRANSPARENTE (PNG com canal alpha).
+- Personagens virados pra DIREITA (o codigo espelha pra esquerda sozinho).
+- Use arte de DOMINIO PUBLICO / CC0 (itch.io, kenney.nl, opengameart com CC0).
+  Se for CC-BY, cite a fonte no README (secao Creditos).
+
+SPRITES SIMPLES (1 quadro)
+--------------------------
+  flecha.png           flecha apontando pra DIREITA (ponta na direita)
+  item_madeira.png     itens coletaveis (~12px). Use a mesma "moldura" nos 5
+  item_couro.png       pra eles parecerem um conjunto.
+  item_pena.png
+  item_ferro.png
+  item_cristal.png
+  npc_ferreiro.png     NPCs da vila (~24px de altura). Diferencie os tres:
+  npc_lojista.png      ferreiro (avental/martelo), lojista (avental/chapeu),
+  npc_aldeao.png       aldeao (comum).
+
+ANIMACOES (spritesheet = tira HORIZONTAL de quadros)
+----------------------------------------------------
+Duas formas de nomear (escolha uma):
+
+  a) com a quantidade de quadros no nome:  <base>_<estado>_<qtd>.png
+     ex.:  jogador_andar_6.png   (6 quadros lado a lado)
+
+  b) sem numero, com quadros QUADRADOS:    <base>_<estado>.png
+     (o jogo deduz a quantidade dividindo largura / altura)
+
+Estados usados pelo jogo:
+  jogador_parado(_N).png    parado/respirando
+  jogador_andar(_N).png     andando
+  jogador_atirar(_N).png    atirando (toca uma vez)
+  jogador_pulo(_N).png      no ar
+  inimigo_andar(_N).png     inimigo andando
+
+(Se faltar algum estado, o jogo usa o placeholder so daquele estado.)
+
+TILES DO CENARIO (16x16)
+------------------------
+  tile_grama.png        topo do chao (com grama)
+  tile_terra.png        miolo do chao (terra)
+  tile_plataforma.png   plataformas flutuantes (madeira)
+
+FUNDO (opcional)
+----------------
+  fundo.png    imagem da camada distante (com parallax). Se nao existir, o jogo
+               desenha morros/montanhas em camadas automaticamente.
+
+ONDE BAIXAR (CC0)
+-----------------
+- itch.io  -> procure "free CC0 pixel art" (ex.: pacotes do 0x72, da Kenney).
+              O "Dungeon Tileset II" (0x72, CC0) tem elfo arqueiro, inimigos e itens.
+- kenney.nl -> tudo CC0 e bem coeso.
+- opengameart.org -> filtre a licenca por CC0.
