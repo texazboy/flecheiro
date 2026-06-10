@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs e temporarios
+*.log
+
+# Apoio interno (nao entra no repositorio)
+docs/GUIA_ENTREGA.md
+refazer_git.ps1
+limpar_git.ps1

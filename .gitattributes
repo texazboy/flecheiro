@@ -1,0 +1,10 @@
+# Garante que o Git trate os fontes como texto e os sprites como binarios.
+# Ajuda a evitar problema de conversao de fim de linha / encoding no repo.
+* text=auto
+*.py   text
+*.md   text
+*.txt  text
+*.png  binary
+*.jpg  binary
+*.ogg  binary
+*.wav  binary
