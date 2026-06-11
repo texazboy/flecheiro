@@ -28,7 +28,8 @@ _CORES_CONFETE = [(232, 196, 92), (96, 178, 102), (138, 92, 168),
 def _terreno_de_tela(recursos, tema):
     """Faixa de chao do tamanho da tela, so pra apoiar as telas de menu."""
     chao = [pygame.Rect(0, 238, config.LARGURA, 32)]
-    return montar_terreno(config.LARGURA, chao, [], recursos, semente=9, tema=tema)
+    sup, _ = montar_terreno(config.LARGURA, chao, [], recursos, semente=9, tema=tema)
+    return sup
 
 
 class MenuState(Estado):

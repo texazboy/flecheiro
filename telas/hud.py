@@ -5,6 +5,8 @@ linha de dicas de teclas. Os icones sao desenhados pixel a pixel uma vez so
 na criacao e reaproveitados.
 """
 
+import math
+
 import pygame
 
 import config
@@ -38,6 +40,17 @@ class HUD:
         self.coracao_cheio = _desenhar_mapa(_MAPA_CORACAO, config.VERMELHO)
         self.coracao_vazio = _desenhar_mapa(_MAPA_CORACAO, config.CINZA_ESCURO)
         self.moeda = self._fazer_moeda()
+        self.alerta_vida = self._fazer_alerta_vida()
+
+    @staticmethod
+    def _fazer_alerta_vida():
+        """Moldura vermelha nas bordas; pulsa quando resta um coracao so."""
+        s = pygame.Surface((config.LARGURA, config.ALTURA), pygame.SRCALPHA)
+        for i in range(22):
+            alfa = int(64 * (1 - i / 22))
+            pygame.draw.rect(s, (200, 40, 40, alfa),
+                             (i, i, config.LARGURA - 2 * i, config.ALTURA - 2 * i), 1)
+        return s
 
     @staticmethod
     def _fazer_moeda():
@@ -48,6 +61,12 @@ class HUD:
         return s
 
     def desenhar(self, tela, dica="", local=""):
+        # com um coracao so, as bordas pulsam em vermelho (perigo!)
+        if self.mundo.vida == 1:
+            pulso = (math.sin(pygame.time.get_ticks() * 0.006) + 1) / 2
+            self.alerta_vida.set_alpha(int(110 + 130 * pulso))
+            tela.blit(self.alerta_vida, (0, 0))
+
         # coracoes
         for i in range(self.mundo.vida_max):
             img = self.coracao_cheio if i < self.mundo.vida else self.coracao_vazio

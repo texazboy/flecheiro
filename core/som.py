@@ -140,6 +140,7 @@ def _gerar_tudo():
     s["porta"] = _som(_mix(_tom(392, 0.30, "tri", 0.18, 2), _tom(494, 0.30, "tri", 0.16, 2),
                            _tom(587, 0.30, "tri", 0.16, 2)))
     s["clique"] = _som(_tom(880, 0.03, "quad", 0.16, 3))
+    s["pronto"] = _som(_seq(_tom(990, 0.04, "quad", 0.18, 3), _tom(1319, 0.07, "quad", 0.18, 3)))
 
     # musiquinhas de fundo (frases curtas em la menor, tocadas em loop)
     vila = _frase([220, 0, 262, 330, 392, 330, 262, 0,
@@ -174,9 +175,11 @@ def iniciar():
     _ok = True
 
 
-def tocar(nome):
+def tocar(nome, volume=1.0):
     if _ok and not _mudo and nome in _sons:
-        _sons[nome].play()
+        canal = _sons[nome].play()
+        if canal is not None and volume < 1.0:
+            canal.set_volume(volume)
 
 
 def musica(nome):
