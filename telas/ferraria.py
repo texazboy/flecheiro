@@ -16,6 +16,7 @@ from collections import Counter
 import pygame
 
 import config
+from core import som
 from telas import comum
 from algoritmos.mochila import resolver_mochila, mochila_gulosa
 from core.mundo import arco_por_qualidade
@@ -49,6 +50,7 @@ class Ferraria:
     def _forjar(self):
         if self.otima.valor <= 0:
             self.mensagem = "Voce nao tem materiais para forjar."
+            som.tocar("clique")
             return
         # consome os materiais escolhidos pela mochila
         contagem = Counter(m.chave for m in self.otima.selecionados)
@@ -59,6 +61,7 @@ class Ferraria:
         self.mundo.arco = arco
         self.mundo.arcos_forjados += 1
         self.mensagem = f"Forjou: {arco.nome} (dano {arco.dano})!"
+        som.tocar("forja")
         self._recalcular()
 
     def _resumo(self, resultado):

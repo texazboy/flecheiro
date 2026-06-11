@@ -49,5 +49,8 @@ class Mundo:
         self.arco = ARCO_INICIAL
         self.vida_max = 5
         self.vida = 5
-        # quantos arcos ja forjou (so pra ter um numerinho de progresso)
+        # estatisticas da partida (aparecem na tela de vitoria)
         self.arcos_forjados = 0
+        self.abatidos = 0
+        self.coletados = 0
+        self.tempo = 0.0

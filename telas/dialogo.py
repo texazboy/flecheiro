@@ -4,6 +4,7 @@
 import pygame
 
 import config
+from core import som
 from telas import comum
 
 
@@ -37,6 +38,7 @@ class Dialogo:
         """Retorna True quando o dialogo terminou."""
         if evento.type == pygame.KEYDOWN:
             if evento.key in (pygame.K_e, pygame.K_SPACE, pygame.K_RETURN):
+                som.tocar("clique")
                 self.indice += 1
                 if self.indice >= len(self.falas):
                     return True

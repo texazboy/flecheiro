@@ -9,6 +9,7 @@ compra uma cura que recupera um coracao. Setas pra navegar, Enter pra vender.
 import pygame
 
 import config
+from core import som
 from telas import comum
 
 CUSTO_CURA = 6
@@ -51,6 +52,7 @@ class Loja:
         material, _ = itens[self.selecao]
         self.mundo.inventario.remover(material, 1)
         self.mundo.ouro += material.valor
+        som.tocar("moeda")
         self.mensagem = f"Vendeu {material.nome} por {material.valor} de ouro."
         # ajusta selecao se o tipo acabou
         if self.selecao >= len(self._itens()):
@@ -64,6 +66,7 @@ class Loja:
         else:
             self.mundo.ouro -= CUSTO_CURA
             self.mundo.vida += 1
+            som.tocar("cura")
             self.mensagem = "Recuperou um coracao!"
 
     def desenhar(self, tela):
