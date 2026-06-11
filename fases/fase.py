@@ -2,36 +2,49 @@
 """
 Fase de acao (side-scroller).
 
-Junta tudo: o arqueiro, as flechas que viram plataforma, os inimigos que dropam
-itens, a coleta por interacao (tecla E) e o overlay do TSP (tecla T), que mostra
-a ordem otima de recolher os itens da fase e voltar ao ponto de partida.
+Junta tudo: o arqueiro com o tiro carregado (segurar o mouse tensiona o arco),
+as flechas que viram plataforma, inimigos terrestres e voadores, a coleta por
+interacao (tecla E) e o overlay do TSP (tecla T), que mostra a ordem otima de
+recolher os itens da fase e ainda marca qual e o proximo alvo da rota.
 
-As duas fases usam esta mesma classe, mudando so o "layout" (ver _layout).
+Sao tres fases com a mesma classe, mudando o layout e a hora do dia:
+  1 - dia      (campo aberto, tutorial natural das mecanicas)
+  2 - poente   (a parede alta que obriga a escalar com flechas)
+  3 - noite    (vaos no chao onde a flecha fincada vira ponte)
 """
+
+import math
+import random
 
 import pygame
 
 import config
 from core.estados import Estado
 from core.camera import Camera
+from core import som
+from core.cenario import Fundo, montar_terreno
 from entidades.jogador import Jogador
-from entidades.inimigo import Inimigo
+from entidades.inimigo import Inimigo, InimigoVoador
 from entidades.item import ItemNoChao, MATERIAIS
-from entidades.efeitos import explosao, TextoFlutuante
+from entidades.efeitos import explosao, faisca, TextoFlutuante
 from telas.hud import HUD
 from telas.tela_inventario import TelaInventario
+from telas.pausa import Pausa
 from telas import comum
-from core.cenario import Fundo, desenhar_solido, desenhar_plataforma
 from algoritmos.tsp import resolver_tsp
+
+TOTAL_FASES = 3
+TEMA_POR_FASE = {1: "dia", 2: "poente", 3: "noite"}
 
 
 def _layout(numero):
-    """Devolve os dados de montagem de cada fase."""
+    """Dados de montagem de cada fase. Inimigos: ("chao", drop, x, alcance)
+    patrulha no chao; ("voo", drop, x, y) paira em volta do ponto."""
     chao_y = 240
     if numero == 1:
         largura = 1600
         solidos = [
-            pygame.Rect(0, chao_y, largura, 60),     # chao
+            pygame.Rect(0, chao_y, largura, 60),     # chao corrido
             pygame.Rect(900, 150, 16, 90),           # pilar pra treinar a escalada
         ]
         plataformas = [
@@ -39,15 +52,14 @@ def _layout(numero):
             pygame.Rect(430, 165, 70, 10),
             pygame.Rect(820, 95, 130, 10),           # plataforma alta (bonus)
         ]
-        # (material_drop, x, alcance_patrulha)
-        inimigos = [("madeira", 200, 48), ("pena", 560, 40),
-                    ("couro", 1150, 60), ("ferro", 1350, 50)]
-        # (material, x, y_centro)
+        inimigos = [("chao", "madeira", 200, 48), ("chao", "pena", 560, 40),
+                    ("voo", "pena", 700, 120),
+                    ("chao", "couro", 1150, 60), ("chao", "ferro", 1350, 50)]
         itens = [("couro", 650, 226), ("madeira", 1250, 226),
                  ("madeira", 320, 186), ("pena", 470, 156),
                  ("cristal", 866, 86), ("ferro", 884, 86)]
-        dica = "Mouse: mirar/atirar  |  E: coletar  |  T: rota otima  |  I: inventario"
-    else:
+        dica = "Segure o mouse pra tensionar o arco  |  E coleta  |  T rota  |  I inventario"
+    elif numero == 2:
         largura = 1700
         solidos = [
             pygame.Rect(0, chao_y, largura, 60),
@@ -58,11 +70,34 @@ def _layout(numero):
             pygame.Rect(1050, 175, 90, 10),
             pygame.Rect(1250, 140, 90, 10),
         ]
-        inimigos = [("couro", 250, 60), ("ferro", 500, 50),
-                    ("ferro", 1120, 60), ("cristal", 1460, 50)]
+        inimigos = [("chao", "couro", 250, 60), ("chao", "ferro", 500, 50),
+                    ("voo", "pena", 880, 70),
+                    ("chao", "ferro", 1120, 60), ("chao", "cristal", 1460, 50)]
         itens = [("ferro", 250, 226), ("madeira", 360, 168),
                  ("couro", 1080, 162), ("cristal", 1300, 128)]
-        dica = "A parede bloqueia: finque flechas nela e suba ate o topo!"
+        dica = "A parede bloqueia o caminho: finque flechas nela e suba!"
+    else:
+        largura = 2000
+        solidos = [
+            # chao com VAOS: cair neles machuca; flecha fincada vira ponte
+            pygame.Rect(0, chao_y, 520, 60),
+            pygame.Rect(600, chao_y, 460, 60),
+            pygame.Rect(1140, chao_y, 860, 60),
+            pygame.Rect(900, 120, 24, 120),          # torre 1
+            pygame.Rect(1500, 90, 24, 150),          # torre 2 (mais alta)
+        ]
+        plataformas = [
+            pygame.Rect(380, 180, 70, 10),
+            pygame.Rect(700, 170, 80, 10),
+            pygame.Rect(1250, 180, 80, 10),
+            pygame.Rect(1620, 140, 90, 10),
+        ]
+        inimigos = [("chao", "couro", 300, 60), ("voo", "pena", 560, 150),
+                    ("chao", "ferro", 800, 70), ("voo", "pena", 1100, 130),
+                    ("voo", "pena", 1450, 80), ("chao", "cristal", 1700, 80)]
+        itens = [("ferro", 250, 226), ("cristal", 912, 106), ("madeira", 740, 152),
+                 ("couro", 1280, 162), ("cristal", 1512, 76), ("ferro", 1900, 226)]
+        dica = "Noite fechada: cuidado com os vaos - a flecha fincada vira ponte!"
 
     porta = pygame.Rect(largura - 80, chao_y - 60, 24, 60)
     return dict(largura=largura, solidos=solidos, plataformas=plataformas,
@@ -87,26 +122,48 @@ class Fase(Estado):
         self.pos_inicial = (40, self.chao_y - 24)
 
         self.jogador = Jogador(*self.pos_inicial, self.recursos)
-        self.inimigos = [self._criar_inimigo(d, x, alc) for (d, x, alc) in dados["inimigos"]]
-        self.itens = [ItemNoChao(x, y, MATERIAIS[ch], self.recursos) for (ch, x, y) in dados["itens"]]
+        self.inimigos = [self._criar_inimigo(d) for d in dados["inimigos"]]
+        self.itens = [ItemNoChao(x, y, MATERIAIS[ch], self.recursos)
+                      for (ch, x, y) in dados["itens"]]
         self.flechas = []
         self.particulas = []
         self.textos = []
 
         self.camera = Camera(config.LARGURA, config.ALTURA, self.largura_mundo)
         self.hud = HUD(self.mundo, self.recursos)
-        self.fundo = Fundo(self.recursos, "dia")
-        self.tile_grama = self.recursos.tile_grama()
-        self.tile_terra = self.recursos.tile_terra()
-        self.tile_plataforma = self.recursos.tile_plataforma()
+        tema = TEMA_POR_FASE.get(numero, "noite")
+        self.fundo = Fundo(self.recursos, tema, semente=numero)
+        self.terreno = montar_terreno(self.largura_mundo, self.solidos,
+                                      self.plataformas, self.recursos,
+                                      semente=numero * 7, tema=tema)
+        self.brilho_porta = self._fazer_brilho_porta()
 
         self.overlay = None
         self.mostrar_rota = False
         self.resultado_tsp = None
         self._itens_rota = []
 
-    def _criar_inimigo(self, dropa, x, alcance):
-        return Inimigo(x, self.chao_y - 18, self.recursos, dropa=dropa, alcance=alcance)
+        # tiro carregado e os timers de efeito
+        self.carregando = False
+        self.carga = 0.0
+        self.hitstop = 0.0
+        self._timer_porta = 0.0
+
+    def entrar(self):
+        som.musica("fase")
+
+    def _criar_inimigo(self, dados):
+        tipo, drop, x, extra = dados
+        if tipo == "voo":
+            return InimigoVoador(x, extra, self.recursos, dropa=drop)
+        return Inimigo(x, self.chao_y - 18, self.recursos, dropa=drop, alcance=extra)
+
+    def _fazer_brilho_porta(self):
+        s = pygame.Surface((72, 88), pygame.SRCALPHA)
+        for raio, alfa in ((34, 18), (24, 32), (15, 48)):
+            pygame.draw.ellipse(s, (180, 120, 230, alfa),
+                                (36 - raio, 44 - raio * 1.2, raio * 2, raio * 2.4))
+        return s
 
     def plataformas_uma_via(self):
         """Plataformas que so seguram por cima = flutuantes + flechas fincadas."""
@@ -115,7 +172,14 @@ class Fase(Estado):
     # ----------------------------------------------------------- eventos
     def tratar_evento(self, evento):
         if self.overlay is not None:
-            if self.overlay.tratar_evento(evento):
+            resultado = self.overlay.tratar_evento(evento)
+            if isinstance(self.overlay, Pausa):
+                if resultado == "menu":
+                    from telas.menu import MenuState
+                    self.jogo.trocar_estado(MenuState(self.jogo))
+                elif resultado == "voltar":
+                    self.overlay = None
+            elif resultado:
                 self.overlay = None
             return
 
@@ -130,27 +194,50 @@ class Fase(Estado):
                     self._recalcular_rota()
             elif evento.key == pygame.K_e:
                 self._coletar_proximos()
-            elif evento.key == pygame.K_ESCAPE:
-                from telas.menu import MenuState
-                self.jogo.trocar_estado(MenuState(self.jogo))
+            elif evento.key in (pygame.K_ESCAPE, pygame.K_p):
+                self.carregando = False
+                self.overlay = Pausa(self.recursos)
 
         elif evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
-            interno = self.jogo.mouse_para_interno(evento.pos)
-            alvo = self.camera.tela_para_mundo(interno)
-            flecha = self.jogador.criar_flecha(alvo, self.mundo.arco)
-            if flecha:
-                self.flechas.append(flecha)
-                self._limitar_flechas()
+            if self.jogador.cooldown_tiro <= 0:
+                self.carregando = True
+                self.carga = 0.0
+        elif evento.type == pygame.MOUSEBUTTONUP and evento.button == 1:
+            if self.carregando:
+                self._soltar_flecha(evento.pos)
+            self.carregando = False
+
+    def _soltar_flecha(self, pos_janela):
+        interno = self.jogo.mouse_para_interno(pos_janela)
+        alvo = self.camera.tela_para_mundo(interno)
+        flecha = self.jogador.criar_flecha(alvo, self.mundo.arco, self.carga)
+        if flecha:
+            self.flechas.append(flecha)
+            self._limitar_flechas()
 
     # ----------------------------------------------------------- update
     def atualizar(self, dt):
         if self.overlay is not None:
-            return  # jogo pausado enquanto o inventario esta aberto
+            return  # jogo pausado enquanto tem overlay aberto
+
+        self.mundo.tempo += dt
+
+        # hit-stop: o mundo congela um instante depois de um abate (impacto!)
+        if self.hitstop > 0:
+            self.hitstop -= dt
+            self.camera.atualizar(dt)
+            return
+
+        if self.carregando:
+            self.carga = min(1.0, self.carga + dt / config.TEMPO_CARGA)
+        self.jogador.mirando = self.carregando
 
         self.jogador.atualizar(dt, self)
 
         for f in self.flechas:
             f.atualizar(dt, self)
+            if not f.fincada and not f.morta and random.random() < 0.5:
+                self.particulas.append(faisca(f.x, f.y, config.AMARELO))
         self._colisao_flecha_inimigo()
         self.flechas = [f for f in self.flechas if not f.morta]
 
@@ -158,8 +245,12 @@ class Fase(Estado):
             inim.atualizar(dt, self)
             if inim.morto:
                 self._dropar(inim)
-                self.particulas += explosao(inim.rect.centerx, inim.rect.centery, config.VERMELHO, 12)
+                self.particulas += explosao(inim.rect.centerx, inim.rect.centery,
+                                            config.VERMELHO, 12)
                 self.camera.sacudir(3)
+                self.hitstop = 0.05
+                self.mundo.abatidos += 1
+                som.tocar("morte")
                 self.inimigos.remove(inim)
             elif inim.rect.colliderect(self.jogador.rect):
                 if self.jogador.levar_dano(self.mundo, 1, origem_x=inim.rect.centerx):
@@ -168,9 +259,19 @@ class Fase(Estado):
         for it in self.itens:
             it.atualizar(dt)
 
+        # fagulhas na porta de saida, pra ela chamar o jogador de longe
+        self._timer_porta += dt
+        if self._timer_porta > 0.2:
+            self._timer_porta = 0.0
+            px = self.porta.centerx + random.randint(-10, 10)
+            py = self.porta.centery + random.randint(-24, 24)
+            self.particulas.append(faisca(px, py, random.choice((config.ROXO, config.AMARELO))))
+
         for p in self.particulas:
             p.atualizar(dt)
         self.particulas = [p for p in self.particulas if not p.morta]
+        if len(self.particulas) > config.PARTICULAS_MAX:
+            del self.particulas[:len(self.particulas) - config.PARTICULAS_MAX]
         for t in self.textos:
             t.atualizar(dt)
         self.textos = [t for t in self.textos if not t.morto]
@@ -198,12 +299,14 @@ class Fase(Estado):
             for inim in self.inimigos:
                 if not inim.morto and f.rect.colliderect(inim.rect):
                     inim.levar_dano(f.dano)
+                    som.tocar("acerto")
                     f.morta = True
                     break
 
     def _dropar(self, inim):
         material = MATERIAIS[inim.dropa]
-        self.itens.append(ItemNoChao(inim.rect.centerx, inim.rect.centery, material, self.recursos))
+        self.itens.append(ItemNoChao(inim.rect.centerx, inim.rect.centery,
+                                     material, self.recursos))
 
     def _limitar_flechas(self):
         fincadas = [f for f in self.flechas if f.fincada]
@@ -217,18 +320,24 @@ class Fase(Estado):
         """Coleta (tecla E) os itens que estiverem perto do jogador."""
         centro = self.jogador.rect.center
         restantes = []
+        pegou = False
         for it in self.itens:
             dx = it.rect.centerx - centro[0]
             dy = it.rect.centery - centro[1]
             if dx * dx + dy * dy <= 24 * 24:
                 self.mundo.inventario.adicionar(it.material, 1)
-                self.particulas += explosao(it.rect.centerx, it.rect.centery, it.material.cor, 6)
+                self.mundo.coletados += 1
+                pegou = True
+                self.particulas += explosao(it.rect.centerx, it.rect.centery,
+                                            it.material.cor, 6)
                 self.textos.append(TextoFlutuante(it.rect.centerx, it.rect.top,
                                                   "+" + it.material.nome, config.AMARELO,
                                                   self.recursos))
             else:
                 restantes.append(it)
         self.itens = restantes
+        if pegou:
+            som.tocar("coleta")
 
     def _checar_queda(self):
         if self.jogador.rect.top > self.altura_mundo + 40:
@@ -243,28 +352,27 @@ class Fase(Estado):
         self.resultado_tsp = resolver_tsp(pontos)
 
     def _avancar(self):
-        if self.numero == 1:
+        som.tocar("porta")
+        if self.numero < TOTAL_FASES:
             from fases.vila import Vila
-            self.jogo.trocar_estado(Vila(self.jogo))
+            self.jogo.trocar_estado(Vila(self.jogo, proxima_fase=self.numero + 1))
         else:
             from telas.menu import VitoriaState
             self.jogo.trocar_estado(VitoriaState(self.jogo))
 
     # ----------------------------------------------------------- desenho
     def desenhar(self, tela):
-        self._desenhar_fundo(tela)
+        self.fundo.desenhar(tela, self.camera.offset_x)
+        tela.blit(self.terreno, self.camera.origem())
 
-        # solidos (chao, paredes, pilares) feitos de tiles
-        for s in self.solidos:
-            desenhar_solido(tela, self.camera.aplicar(s), self.tile_grama, self.tile_terra)
-        # plataformas flutuantes
-        for p in self.plataformas:
-            desenhar_plataforma(tela, self.camera.aplicar(p), self.tile_plataforma)
-
-        # porta de saida
+        # porta de saida com brilho pulsante
         porta = self.camera.aplicar(self.porta)
+        pulso = 120 + int(60 * math.sin(pygame.time.get_ticks() * 0.004))
+        self.brilho_porta.set_alpha(pulso)
+        tela.blit(self.brilho_porta, (porta.centerx - 36, porta.centery - 44))
         pygame.draw.rect(tela, config.ROXO, porta)
         pygame.draw.rect(tela, config.AMARELO, porta, 1)
+        pygame.draw.circle(tela, (210, 170, 240), porta.center, 5, 1)
 
         for it in self.itens:
             it.desenhar(tela, self.camera)
@@ -284,16 +392,16 @@ class Fase(Estado):
         if self.mostrar_rota:
             self._desenhar_rota(tela)
 
-        self.hud.desenhar(tela, self.dica)
+        self.hud.desenhar(tela, self.dica, f"Fase {self.numero}/{TOTAL_FASES}")
 
         if self.overlay is not None:
             self.overlay.desenhar(tela)
 
-    def _desenhar_fundo(self, tela):
-        self.fundo.desenhar(tela, self.camera.offset_x)
+    # --- mira, arco e a previa da trajetoria ---
+    def _vel_flecha_atual(self):
+        return config.FORCA_FLECHA * (0.55 + 0.45 * self.carga) * self.mundo.arco.velocidade
 
     def _desenhar_arco_e_mira(self, tela):
-        import math
         # direcao calculada no MUNDO (sem o tremor da camera, pra mira nao tremer)
         alvo = self.camera.tela_para_mundo(self.jogo.mouse_interno())
         centro = self.jogador.rect.center
@@ -305,24 +413,30 @@ class Fase(Estado):
 
         origem = self.camera.aplicar_ponto(centro)
 
-        # previa da trajetoria (a curvinha pontilhada que a flecha vai fazer)
-        self._desenhar_trajetoria(tela, centro, ux, uy)
+        if self.carregando:
+            self._desenhar_trajetoria(tela, centro, ux, uy)
+            # barrinha de tensao em cima do jogador
+            r = self.camera.aplicar(self.jogador.rect)
+            cor = (int(232 + 23 * self.carga), int(196 - 120 * self.carga), 70)
+            pygame.draw.rect(tela, config.PRETO, (r.left - 1, r.top - 8, 18, 4))
+            pygame.draw.rect(tela, cor, (r.left, r.top - 7, int(16 * self.carga), 2))
 
-        # o arco (uma curva curta) e a flecha encaixada apontando pro cursor
+        # o arco (curva curta) e a flecha encaixada apontando pro cursor
+        recuo = 2 + 3 * self.carga if self.carregando else 2
         topo = (origem[0] + px * 6, origem[1] + py * 6)
         base = (origem[0] - px * 6, origem[1] - py * 6)
-        frente = (origem[0] + ux * 5, origem[1] + uy * 5)
+        frente = (origem[0] + ux * (7 - recuo), origem[1] + uy * (7 - recuo))
         pygame.draw.lines(tela, config.MARROM_CLARO, False, [topo, frente, base], 2)
-        rabo = (origem[0] - ux * 3, origem[1] - uy * 3)
-        ponta = (origem[0] + ux * 10, origem[1] + uy * 10)
+        rabo = (origem[0] - ux * recuo, origem[1] - uy * recuo)
+        ponta = (origem[0] + ux * (12 - recuo), origem[1] + uy * (12 - recuo))
         pygame.draw.line(tela, config.BRANCO, rabo, ponta, 1)
 
-        # mira no cursor
         mira = self.jogo.mouse_interno()
         pygame.draw.circle(tela, config.BRANCO, mira, 3, 1)
 
     def _desenhar_trajetoria(self, tela, centro, ux, uy):
-        vel = config.FORCA_FLECHA * self.mundo.arco.velocidade
+        """Pontilha o caminho que a flecha faria se soltasse agora."""
+        vel = self._vel_flecha_atual()
         vx = ux * vel
         vy = uy * vel
         x, y = float(centro[0]), float(centro[1])
@@ -332,13 +446,16 @@ class Fase(Estado):
             y += vy
             if y > self.altura_mundo or x < 0 or x > self.largura_mundo:
                 break
-            ponto_solido = pygame.Rect(int(x) - 1, int(y) - 1, 2, 2)
-            if any(ponto_solido.colliderect(s) for s in self.solidos):
+            ponto = pygame.Rect(int(x) - 1, int(y) - 1, 2, 2)
+            if any(ponto.colliderect(s) for s in self.solidos):
+                px, py = self.camera.aplicar_ponto((x, y))
+                pygame.draw.circle(tela, config.BRANCO, (int(px), int(py)), 2, 1)
                 break
             if i % 3 == 0:
                 px, py = self.camera.aplicar_ponto((x, y))
                 pygame.draw.circle(tela, config.AMARELO, (int(px), int(py)), 1)
 
+    # --- overlay do TSP ---
     def _desenhar_rota(self, tela):
         fonte = self.recursos.fonte(15)
         if not self._itens_rota or self.resultado_tsp is None:
@@ -356,6 +473,19 @@ class Fase(Estado):
             p = self.camera.aplicar_ponto(coords[indice])
             pygame.draw.circle(tela, config.VERMELHO if indice == 0 else config.AMARELO, p, 4)
             comum.texto(tela, fonte, str(posicao), p[0] - 2, p[1] - 16, config.BRANCO)
+
+        # marcador pulsante no PROXIMO alvo da rota (o jogador e o ponto 0)
+        if len(ordem) > 1:
+            alvo = coords[ordem[1]]
+            ax, ay = self.camera.aplicar_ponto(alvo)
+            ax = max(12, min(config.LARGURA - 12, ax))
+            ay = max(26, min(config.ALTURA - 30, ay))
+            salto = math.sin(pygame.time.get_ticks() * 0.008) * 3
+            topo = ay - 18 + salto
+            pygame.draw.polygon(tela, config.AMARELO,
+                                [(ax - 5, topo), (ax + 5, topo), (ax, topo + 7)])
+            pygame.draw.polygon(tela, config.PRETO,
+                                [(ax - 5, topo), (ax + 5, topo), (ax, topo + 7)], 1)
 
         r = self.resultado_tsp
         comum.texto(tela, fonte,
