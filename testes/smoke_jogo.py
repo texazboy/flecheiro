@@ -42,8 +42,9 @@ def atirar(jogo, fase, pos):
     fase.tratar_evento(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=pos))
 
 
-def passar_dialogo(vila, vezes):
-    for _ in range(vezes):
+def passar_dialogo(vila, falas):
+    """Cada fala pede dois E: um revela o texto (maquina de escrever), outro avanca."""
+    for _ in range(falas * 2):
         vila.tratar_evento(tecla(pygame.K_e))
 
 
@@ -80,7 +81,8 @@ def main():
 
     # --- vila: ferreiro -> dialogo -> ferraria -> forja ---
     vila.jogador.rect.centerx = 200
-    passar_dialogo(vila, 1 + 3)                  # abre + 3 falas -> vira ferraria
+    vila.tratar_evento(tecla(pygame.K_e))        # abre o dialogo
+    passar_dialogo(vila, 3)                      # 3 falas -> vira ferraria
     vila.desenhar(jogo.tela)
     vila.tratar_evento(tecla(pygame.K_f))        # forja (mochila)
     vila.desenhar(jogo.tela)
@@ -88,7 +90,8 @@ def main():
 
     # --- vila: lojista -> dialogo -> loja -> vende/compra ---
     vila.jogador.rect.centerx = 430
-    passar_dialogo(vila, 1 + 3)
+    vila.tratar_evento(tecla(pygame.K_e))
+    passar_dialogo(vila, 3)
     vila.desenhar(jogo.tela)
     vila.tratar_evento(tecla(pygame.K_RETURN))   # vende
     vila.tratar_evento(tecla(pygame.K_c))        # compra cura

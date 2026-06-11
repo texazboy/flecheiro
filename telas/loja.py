@@ -19,10 +19,11 @@ class Loja:
     def __init__(self, mundo, recursos):
         self.mundo = mundo
         self.recursos = recursos
-        self.fonte = recursos.fonte(18)
+        self.fonte = recursos.fonte(20)
         self.fonte_p = recursos.fonte(15)
         self.selecao = 0
-        self.mensagem = "Setas: escolher  |  Enter: vender  |  C: comprar cura"
+        self.mensagem = "Bem-vindo! O que vai querer hoje?"
+        self._nasceu = pygame.time.get_ticks()
 
     def _itens(self):
         return self.mundo.inventario.listar()
@@ -71,29 +72,49 @@ class Loja:
 
     def desenhar(self, tela):
         comum.escurecer(tela, 175)
-        painel = pygame.Rect(28, 20, config.LARGURA - 56, config.ALTURA - 40)
-        comum.painel(tela, painel, cor_fundo=(26, 34, 46))
+        desloc = int((1.0 - comum.surgimento(self._nasceu)) * 14)
+        painel = pygame.Rect(28, 16 + desloc, config.LARGURA - 56, config.ALTURA - 32)
+        comum.painel(tela, painel, cor_fundo=(26, 34, 48))
 
-        comum.texto(tela, self.fonte, "LOJA", painel.centerx, painel.top + 12,
-                    config.AZUL_CEU, centro=True)
-        comum.texto(tela, self.fonte_p, f"Ouro: {self.mundo.ouro}    Cura: {CUSTO_CURA} ouro [C]",
-                    painel.centerx, painel.top + 28, config.AMARELO, centro=True)
+        comum.faixa_titulo(tela, self.fonte, "LOJA DA CILA", painel.centerx,
+                           painel.top + 14, config.AZUL_CEU)
+
+        # cabecalho: bolsa de ouro e oferta de cura
+        pygame.draw.circle(tela, config.AMARELO, (painel.left + 18, painel.top + 33), 4)
+        pygame.draw.circle(tela, (160, 130, 40), (painel.left + 18, painel.top + 33), 4, 1)
+        comum.texto(tela, self.fonte_p, str(self.mundo.ouro), painel.left + 27,
+                    painel.top + 28, config.AMARELO)
+        r = comum.keycap(tela, self.fonte_p, "C", painel.right - 118, painel.top + 27)
+        comum.texto(tela, self.fonte_p, f"cura ({CUSTO_CURA} ouro)", r.right + 4,
+                    painel.top + 28, (255, 130, 130))
+
+        comum.separador(tela, painel.left + 10, painel.right - 10, painel.top + 45)
 
         itens = self._itens()
-        y = painel.top + 48
+        y = painel.top + 54
         if not itens:
             comum.texto(tela, self.fonte_p, "(sem materiais para vender)",
                         painel.centerx, painel.centery, config.CINZA, centro=True)
         else:
             for i, (material, qtd) in enumerate(itens):
-                cor = config.AMARELO if i == self.selecao else config.BRANCO
-                marcador = ">" if i == self.selecao else " "
-                comum.texto(tela, self.fonte_p,
-                            f"{marcador} {material.nome} x{qtd}  -  vende por {material.valor}",
-                            painel.left + 16, y, cor)
-                y += 17
+                linha = pygame.Rect(painel.left + 10, y - 3, painel.width - 20, 20)
+                if i == self.selecao:
+                    s = pygame.Surface(linha.size, pygame.SRCALPHA)
+                    s.fill((120, 170, 230, 38))
+                    tela.blit(s, linha.topleft)
+                    pygame.draw.rect(tela, (120, 170, 230), linha, 1)
+                    comum.cursor_selecao(tela, linha.left + 4, y + 2)
+                sprite = self.recursos.sprite_item(material)
+                tela.blit(sprite, (linha.left + 14, y - 1))
+                cor = config.BRANCO if i == self.selecao else config.CINZA
+                comum.texto(tela, self.fonte_p, f"{material.nome} x{qtd}",
+                            linha.left + 30, y, cor)
+                comum.texto(tela, self.fonte_p, f"+{material.valor} ouro",
+                            linha.right - 64, y, config.AMARELO)
+                y += 21
 
-        comum.texto(tela, self.fonte_p, self.mensagem, painel.centerx, painel.bottom - 30,
-                    config.BRANCO, centro=True)
-        comum.texto(tela, self.fonte_p, "[Q] sair", painel.centerx, painel.bottom - 14,
-                    config.CINZA, centro=True)
+        comum.texto(tela, self.fonte_p, self.mensagem, painel.centerx,
+                    painel.bottom - 32, config.BRANCO, centro=True)
+        comum.legenda_teclas(tela, self.fonte_p,
+                             [("Enter", "vender"), ("C", "cura"), ("Q", "sair")],
+                             painel.centerx, painel.bottom - 21)

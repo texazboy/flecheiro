@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Tela de pausa (Esc). Antes o Esc jogava direto pro menu e perdia a fase toda;
-agora pausa de verdade, mostra os controles e deixa escolher entre continuar
-ou desistir pro menu.
+agora pausa de verdade, mostra os controles (com as teclinhas desenhadas) e
+deixa escolher entre continuar ou desistir pro menu.
 """
 
 import pygame
@@ -11,14 +11,15 @@ import config
 from core import som
 from telas import comum
 
+# (tecla, acao) - viram keycaps na tela
 _CONTROLES = [
-    "A/D ou setas .... andar",
-    "Espaco ......... pular",
-    "Segurar mouse .. tensionar o arco (solta = atira)",
-    "E .............. coletar / conversar",
-    "T .............. rota otima de coleta (TSP)",
-    "I .............. inventario",
-    "M .............. som liga/desliga",
+    ("A/D", "andar"),
+    ("Espaco", "pular"),
+    ("Mouse", "segurar tensiona o arco, soltar atira"),
+    ("E", "coletar / conversar"),
+    ("T", "rota otima de coleta (TSP)"),
+    ("I", "inventario"),
+    ("M", "som liga/desliga"),
 ]
 
 
@@ -26,6 +27,7 @@ class Pausa:
     def __init__(self, recursos):
         self.fonte = recursos.fonte(24)
         self.fonte_p = recursos.fonte(15)
+        self._nasceu = pygame.time.get_ticks()
 
     def tratar_evento(self, evento):
         """Devolve 'voltar', 'menu' ou None."""
@@ -39,13 +41,20 @@ class Pausa:
 
     def desenhar(self, tela):
         comum.escurecer(tela, 160)
-        painel = pygame.Rect(90, 40, config.LARGURA - 180, config.ALTURA - 80)
+        desloc = int((1.0 - comum.surgimento(self._nasceu)) * 14)
+        painel = pygame.Rect(94, 30 + desloc, config.LARGURA - 188, config.ALTURA - 60)
         comum.painel(tela, painel)
-        comum.texto(tela, self.fonte, "PAUSA", painel.centerx, painel.top + 18,
-                    config.AMARELO, centro=True)
+
+        comum.faixa_titulo(tela, self.fonte, "PAUSA", painel.centerx, painel.top + 16)
+        comum.separador(tela, painel.left + 10, painel.right - 10, painel.top + 30)
+
         y = painel.top + 40
-        for linha in _CONTROLES:
-            comum.texto(tela, self.fonte_p, linha, painel.left + 14, y, config.BRANCO)
-            y += 15
-        comum.texto(tela, self.fonte_p, "[Esc] continuar     [Q] desistir pro menu",
-                    painel.centerx, painel.bottom - 16, config.CINZA, centro=True)
+        for tecla_txt, acao in _CONTROLES:
+            r = comum.keycap(tela, self.fonte_p, tecla_txt, painel.left + 14, y)
+            comum.texto(tela, self.fonte_p, acao, r.right + 8, y + 1, config.BRANCO)
+            y += 17
+
+        comum.separador(tela, painel.left + 10, painel.right - 10, painel.bottom - 28)
+        comum.legenda_teclas(tela, self.fonte_p,
+                             [("Esc", "continuar"), ("Q", "desistir")],
+                             painel.centerx, painel.bottom - 21)

@@ -66,29 +66,39 @@ class MenuState(Estado):
         tela.blit(self.anim.quadro(), (52, 238 - 24))
 
         bob = math.sin(self.tempo * 2.0) * 3
-        comum.texto(tela, self.fonte_g, "FLECHEIRO", config.LARGURA // 2,
-                    int(66 + bob), config.AMARELO, centro=True)
+        cx = config.LARGURA // 2
+        # titulo com contorno: quatro sombras em volta + cara dourada
+        ty = int(66 + bob)
+        for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+            comum.texto(tela, self.fonte_g, "FLECHEIRO", cx + dx, ty + dy,
+                        (60, 40, 10), centro=True, sombra=False)
+        comum.texto(tela, self.fonte_g, "FLECHEIRO", cx, ty, config.AMARELO, centro=True)
         # uma flecha sublinhando o titulo
         y = int(92 + bob)
         pygame.draw.line(tela, config.BRANCO, (150, y), (322, y), 1)
         pygame.draw.polygon(tela, config.BRANCO, [(322, y - 3), (330, y), (322, y + 3)])
+        pygame.draw.rect(tela, config.VERMELHO, (148, y - 2, 2, 5))
         comum.texto(tela, self.fonte_p, "um arqueiro, algoritmos e muitas flechas",
-                    config.LARGURA // 2, 106, config.BRANCO, centro=True)
+                    cx, 106, config.BRANCO, centro=True)
 
         if int(self.tempo * 1.6) % 2 == 0:
-            comum.texto(tela, self.fonte, "ENTER  -  comecar", config.LARGURA // 2, 146,
-                        config.VERDE, centro=True)
+            r = comum.keycap(tela, self.fonte_p, "Enter", cx - 44, 140)
+            comum.texto(tela, self.fonte, "comecar", r.right + 6, 139, config.VERDE)
 
-        painel = pygame.Rect(120, 164, config.LARGURA - 240, 64)
-        comum.painel(tela, painel, alpha=170)
-        comum.texto(tela, self.fonte_p, "Mover: A/D    Pular: Espaco    Atirar: segure e solte o mouse",
-                    painel.centerx, painel.top + 14, config.CINZA, centro=True)
-        comum.texto(tela, self.fonte_p, "Coletar: E    Rota otima (TSP): T    Inventario: I",
-                    painel.centerx, painel.top + 30, config.CINZA, centro=True)
-        comum.texto(tela, self.fonte_p, "Pausa: Esc    Som: M",
-                    painel.centerx, painel.top + 46, config.CINZA, centro=True)
+        painel = pygame.Rect(82, 164, config.LARGURA - 164, 64)
+        comum.painel(tela, painel, alpha=185)
+        comum.legenda_teclas(tela, self.fonte_p,
+                             [("A/D", "mover"), ("Espaco", "pular"),
+                              ("Mouse", "segurar/soltar atira")],
+                             painel.centerx, painel.top + 9)
+        comum.legenda_teclas(tela, self.fonte_p,
+                             [("E", "coletar"), ("T", "rota TSP"), ("I", "inventario")],
+                             painel.centerx, painel.top + 26)
+        comum.legenda_teclas(tela, self.fonte_p,
+                             [("Esc", "pausa"), ("M", "som")],
+                             painel.centerx, painel.top + 43)
 
-        comum.texto(tela, self.fonte_p, "ESC para sair", config.LARGURA // 2,
+        comum.texto(tela, self.fonte_p, "ESC para sair", cx,
                     config.ALTURA - 14, config.CINZA, centro=True)
 
 
@@ -122,31 +132,44 @@ class VitoriaState(Estado):
             p.atualizar(dt)
         self.confetes = [p for p in self.confetes if not p.morta]
 
+    def _medalha(self, tela, cx, cy):
+        """Medalhinha de ouro com fita, coroando o painel de vitoria."""
+        pygame.draw.polygon(tela, (190, 60, 70), [(cx - 6, cy - 14), (cx - 1, cy - 4),
+                                                  (cx - 9, cy - 4)])
+        pygame.draw.polygon(tela, (150, 45, 60), [(cx + 6, cy - 14), (cx + 9, cy - 4),
+                                                  (cx + 1, cy - 4)])
+        pygame.draw.circle(tela, config.AMARELO, (cx, cy), 8)
+        pygame.draw.circle(tela, (170, 135, 40), (cx, cy), 8, 1)
+        pygame.draw.circle(tela, (255, 240, 170), (cx - 2, cy - 2), 2)
+        comum.texto(tela, self.fonte, "1", cx, cy + 1, (120, 92, 20),
+                    centro=True, sombra=False)
+
     def desenhar(self, tela):
         self.fundo.desenhar(tela, self.tempo * 6)
         tela.blit(self.terreno, (0, 0))
         m = self.jogo.mundo
 
-        comum.texto(tela, self.fonte_g, "VITORIA!", config.LARGURA // 2, 58,
-                    config.AMARELO, centro=True)
+        comum.faixa_titulo(tela, self.fonte_g, "VITORIA!", config.LARGURA // 2, 52)
 
-        painel = pygame.Rect(130, 92, config.LARGURA - 260, 102)
-        comum.painel(tela, painel, alpha=200)
+        painel = pygame.Rect(130, 92, config.LARGURA - 260, 104)
+        comum.painel(tela, painel, alpha=215)
+        self._medalha(tela, painel.centerx, painel.top + 2)
         minutos = int(m.tempo // 60)
         segundos = int(m.tempo % 60)
         linhas = [
             f"Tempo de jornada: {minutos}m {segundos:02d}s",
             f"Inimigos vencidos: {m.abatidos}    Itens coletados: {m.coletados}",
             f"Arcos forjados: {m.arcos_forjados}    Ouro: {m.ouro}",
-            f"Arco final: {m.arco.nome}",
         ]
-        y = painel.top + 14
+        y = painel.top + 20
         for linha in linhas:
             comum.texto(tela, self.fonte, linha, painel.centerx, y, config.BRANCO, centro=True)
             y += 21
+        comum.texto(tela, self.fonte, f"Arco final: {m.arco.nome}",
+                    painel.centerx, y, config.VERDE, centro=True)
 
-        comum.texto(tela, self.fonte, "ENTER para voltar ao menu", config.LARGURA // 2,
-                    config.ALTURA - 26, config.CINZA, centro=True)
+        comum.legenda_teclas(tela, self.fonte, [("Enter", "voltar ao menu")],
+                             config.LARGURA // 2, config.ALTURA - 30)
 
         for p in self.confetes:
             p.desenhar(tela, self.camera)
@@ -175,9 +198,12 @@ class GameOverState(Estado):
     def desenhar(self, tela):
         self.fundo.desenhar(tela, 0)
         comum.escurecer(tela, 90)
-        comum.texto(tela, self.fonte_g, "VOCE CAIU", config.LARGURA // 2, 90,
-                    config.VERMELHO, centro=True)
+        painel = pygame.Rect(140, 70, config.LARGURA - 280, 110)
+        comum.painel(tela, painel, cor_fundo=(40, 22, 26), alpha=225)
+        comum.texto(tela, self.fonte_g, "VOCE CAIU", painel.centerx,
+                    painel.top + 24, config.VERMELHO, centro=True)
         comum.texto(tela, self.fonte, f"A fase {self.numero} ainda espera por voce.",
-                    config.LARGURA // 2, 130, config.BRANCO, centro=True)
-        comum.texto(tela, self.fonte, "R - tentar de novo     ESC - menu",
-                    config.LARGURA // 2, 160, config.CINZA, centro=True)
+                    painel.centerx, painel.top + 52, config.BRANCO, centro=True)
+        comum.legenda_teclas(tela, self.fonte,
+                             [("R", "tentar de novo"), ("Esc", "menu")],
+                             painel.centerx, painel.bottom - 28)

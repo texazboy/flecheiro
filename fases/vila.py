@@ -166,7 +166,8 @@ class Vila(Estado):
         alvo = self._npc_proximo()
         if alvo is not None:
             self.npc_em_acao = alvo
-            self.overlay = Dialogo(alvo.nome, alvo.falas, self.recursos)
+            self.overlay = Dialogo(alvo.nome, alvo.falas, self.recursos,
+                                   retrato=alvo.sprite)
         elif self.jogador.rect.colliderect(self.porta):
             som.tocar("porta")
             from fases.fase import Fase
@@ -223,7 +224,8 @@ class Vila(Estado):
         for p in self.particulas:
             p.desenhar(tela, self.camera)
 
-        proximo = self._npc_proximo()
+        # o aviso [E] some enquanto um dialogo/loja esta aberto
+        proximo = self._npc_proximo() if self.overlay is None else None
         for npc in self.npcs:
             npc.desenhar(tela, self.camera, destacar=(npc is proximo))
 
