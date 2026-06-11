@@ -60,7 +60,7 @@ class TelaInventario:
         painel = pygame.Rect(40, 22 + desloc, config.LARGURA - 80, config.ALTURA - 44)
         comum.painel(tela, painel)
 
-        comum.faixa_titulo(tela, self.fonte, "INVENTARIO", painel.centerx, painel.top + 14)
+        comum.faixa_titulo(tela, self.fonte, "INVENTARIO", painel.centerx, painel.top + 2)
 
         # abas de ordenacao (a ativa fica acesa, como tecla pressionada)
         ax = painel.centerx - 92

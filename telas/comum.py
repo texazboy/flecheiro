@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Kit de interface compartilhado pelas telas.
+Kit de interface compartilhado pelas telas - estilo "moldura dourada" de RPG.
 
-Tudo que e "cara" do jogo mora aqui: o painel chanfrado com gradiente, a faixa
-de titulo com os losanguinhos, as teclas desenhadas (keycap), a barrinha de
-progresso e o cursor de selecao. Os overlays usam essas pecas e ficam todos com
-a mesma identidade visual.
+Todo painel tem contorno escuro, moldura de ouro com bisel (clara em cima,
+escura embaixo), rebites nos cantos e interior escuro com um leve brilho no
+topo. Os titulos ficam em "faixas" (pilulas douradas) que cavalgam a borda do
+painel, e as teclas viram botoezinhos dourados. Como todas as telas usam estas
+mesmas pecas, o jogo inteiro fica com a mesma identidade.
 
-O texto renderizado fica num cache: a HUD escreve as mesmas frases todo frame
-e o font.render do pygame nao e de graca.
+O texto renderizado fica em cache: a HUD escreve as mesmas frases todo frame.
 """
 
 import math
@@ -16,6 +16,13 @@ import math
 import pygame
 
 import config
+
+# paleta da moldura
+OURO_CLARO = (238, 200, 124)
+OURO = (198, 148, 70)
+OURO_ESCURO = (130, 90, 42)
+CONTORNO = (28, 20, 18)
+FUNDO_PAINEL = (52, 46, 52)
 
 _cache_texto = {}
 
@@ -44,68 +51,76 @@ def texto(tela, fonte, msg, x, y, cor=config.BRANCO, centro=False, sombra=True):
     return r
 
 
+def _rebite(s, cx, cy):
+    pygame.draw.circle(s, CONTORNO, (cx, cy), 3)
+    pygame.draw.circle(s, OURO, (cx, cy), 2)
+    s.set_at((cx - 1, cy - 1), OURO_CLARO)
+
+
 # ---------------------------------------------------------------- paineis
-def painel(tela, rect, cor_fundo=(30, 32, 48), cor_borda=None, alpha=235):
-    """Painel estilo RPG: gradiente vertical, cantos chanfrados, borda dupla
-    (escura por fora, um fio de luz por dentro no topo)."""
-    s = pygame.Surface(rect.size, pygame.SRCALPHA)
-    topo = (min(255, cor_fundo[0] + 14), min(255, cor_fundo[1] + 14),
-            min(255, cor_fundo[2] + 18))
-    h = rect.height
-    for y in range(h):
-        f = y / max(1, h - 1)
-        cor = (int(topo[0] + (cor_fundo[0] - topo[0]) * f),
-               int(topo[1] + (cor_fundo[1] - topo[1]) * f),
-               int(topo[2] + (cor_fundo[2] - topo[2]) * f), alpha)
-        s.fill(cor, (0, y, rect.width, 1))
+def painel(tela, rect, cor_fundo=None, cor_borda=None, alpha=238):
+    """Painel com moldura dourada, bisel e rebites nos cantos."""
+    base = cor_fundo if cor_fundo else FUNDO_PAINEL
+    w, h = rect.width, rect.height
+    raio = min(7, h // 2)
+    s = pygame.Surface((w, h), pygame.SRCALPHA)
 
-    # chanfro: recorta 2px de cada canto
-    vazio = (0, 0, 0, 0)
-    w = rect.width
-    for px, py in ((0, 0), (w - 2, 0), (0, h - 2), (w - 2, h - 2)):
-        s.fill(vazio, (px, py, 2, 1) if py in (0, h - 2) else (px, py, 1, 2))
-    s.fill(vazio, (0, 0, 1, 2))
-    s.fill(vazio, (w - 1, 0, 1, 2))
-    s.fill(vazio, (0, h - 2, 1, 2))
-    s.fill(vazio, (w - 1, h - 2, 1, 2))
+    pygame.draw.rect(s, CONTORNO, (0, 0, w, h), border_radius=raio)
+    pygame.draw.rect(s, OURO, (1, 1, w - 2, h - 2), border_radius=max(2, raio - 1))
+    # bisel da moldura: luz em cima, sombra embaixo
+    pygame.draw.rect(s, OURO_CLARO, (1, 1, w - 2, h - 2), width=1,
+                     border_radius=max(2, raio - 1))
+    pygame.draw.line(s, OURO_ESCURO, (4, h - 3), (w - 5, h - 3), 1)
 
-    # contorno chanfrado
-    escura = cor_borda if cor_borda else (10, 10, 16)
-    pontos = [(2, 0), (w - 3, 0), (w - 1, 2), (w - 1, h - 3),
-              (w - 3, h - 1), (2, h - 1), (0, h - 3), (0, 2)]
-    pygame.draw.lines(s, escura, True, pontos, 1)
-    # fio de luz interno no topo (luz vindo de cima)
-    pygame.draw.line(s, (255, 255, 255, 26), (2, 1), (w - 3, 1), 1)
+    # interior escuro (com a transparencia pedida) e brilho no topo
+    interior = pygame.Rect(3, 3, w - 6, h - 6)
+    pygame.draw.rect(s, (base[0], base[1], base[2], alpha), interior,
+                     border_radius=max(2, raio - 2))
+    pygame.draw.rect(s, (0, 0, 0, 90), interior, width=1,
+                     border_radius=max(2, raio - 2))
+    sheen = pygame.Rect(5, 4, w - 10, max(2, h // 7))
+    pygame.draw.rect(s, (255, 255, 255, 12), sheen, border_radius=3)
+
+    if w > 70 and h > 34:
+        _rebite(s, 6, 6)
+        _rebite(s, w - 7, 6)
+        _rebite(s, 6, h - 7)
+        _rebite(s, w - 7, h - 7)
 
     tela.blit(s, rect.topleft)
 
 
-def faixa_titulo(tela, fonte, msg, cx, y, cor=config.AMARELO):
-    """Titulo com linhas e losanguinhos dos lados:  ---<> TITULO <>---"""
-    r = texto(tela, fonte, msg, cx, y, cor, centro=True)
-    cy = r.centery
-    for lado in (-1, 1):
-        losango_x = (r.left - 11) if lado < 0 else (r.right + 11)
-        inicio_x = losango_x + 5 * lado
-        fim_x = inicio_x + 30 * lado
-        pygame.draw.line(tela, cor, (inicio_x, cy), (fim_x, cy), 1)
-        pygame.draw.polygon(tela, cor, [(losango_x - 3, cy), (losango_x, cy - 3),
-                                        (losango_x + 3, cy), (losango_x, cy + 3)])
+def faixa_titulo(tela, fonte, msg, cx, y, cor=OURO_CLARO):
+    """Faixa-pilula dourada com o titulo dentro (cavalga a borda do painel)."""
+    w = fonte.size(msg)[0] + 34
+    h = 20
+    r = pygame.Rect(0, 0, w, h)
+    r.center = (cx, y)
+    pygame.draw.rect(tela, CONTORNO, r.inflate(4, 4), border_radius=11)
+    pygame.draw.rect(tela, OURO, r.inflate(2, 2), border_radius=10)
+    pygame.draw.line(tela, OURO_CLARO, (r.left + 4, r.top - 0), (r.right - 4, r.top - 0), 1)
+    interior = r.inflate(-4, -4)
+    pygame.draw.rect(tela, (40, 34, 40), interior, border_radius=7)
+    texto(tela, fonte, msg, cx, y, cor, centro=True)
+    # pininhos nas pontas, como nos banners de referencia
+    for px in (r.left - 1, r.right + 1):
+        pygame.draw.circle(tela, CONTORNO, (px, r.centery), 3)
+        pygame.draw.circle(tela, OURO, (px, r.centery), 2)
     return r
 
 
 def keycap(tela, fonte, tecla_txt, x, y, ativa=False):
-    """Desenha uma teclinha de teclado. Devolve o rect (pra encadear texto)."""
-    w = fonte.size(tecla_txt)[0] + 8
+    """Botaozinho dourado com o nome da tecla. Devolve o rect."""
+    w = fonte.size(tecla_txt)[0] + 9
     h = 13
     r = pygame.Rect(x, y, w, h)
-    fundo = (210, 200, 120) if ativa else (52, 56, 74)
-    pygame.draw.rect(tela, (14, 14, 20), r.move(0, 1))           # sombra da tecla
-    pygame.draw.rect(tela, fundo, r)
-    pygame.draw.line(tela, (255, 255, 255), (r.left + 1, r.top), (r.right - 2, r.top), 1)
-    pygame.draw.rect(tela, (14, 14, 20), r, 1)
-    cor_txt = (30, 28, 16) if ativa else config.BRANCO
-    img = _render(fonte, tecla_txt, cor_txt)
+    pygame.draw.rect(tela, CONTORNO, r.move(0, 1), border_radius=4)
+    cor_corpo = OURO_CLARO if ativa else OURO
+    pygame.draw.rect(tela, cor_corpo, r, border_radius=4)
+    clara = (255, 232, 170) if ativa else OURO_CLARO
+    pygame.draw.line(tela, clara, (r.left + 2, r.top), (r.right - 3, r.top), 1)
+    pygame.draw.rect(tela, CONTORNO, r, width=1, border_radius=4)
+    img = _render(fonte, tecla_txt, (46, 32, 16))
     tela.blit(img, (r.centerx - img.get_width() // 2,
                     r.centery - img.get_height() // 2))
     return r
@@ -115,7 +130,7 @@ def legenda_teclas(tela, fonte, itens, cx, y):
     """Linha de '[tecla] acao' centralizada. itens = [(tecla, acao), ...]"""
     larguras = []
     for tecla_txt, acao in itens:
-        larguras.append(fonte.size(tecla_txt)[0] + 8 + 4 + fonte.size(acao)[0] + 14)
+        larguras.append(fonte.size(tecla_txt)[0] + 9 + 4 + fonte.size(acao)[0] + 14)
     x = cx - sum(larguras) // 2
     for (tecla_txt, acao), w in zip(itens, larguras):
         r = keycap(tela, fonte, tecla_txt, x, y)
@@ -123,30 +138,38 @@ def legenda_teclas(tela, fonte, itens, cx, y):
         x += w
 
 
-def barra(tela, rect, frac, cor, cor_fundo=(18, 20, 30)):
-    """Barrinha de progresso com miolo em dois tons."""
+def barra(tela, rect, frac, cor, cor_fundo=(24, 20, 26)):
+    """Barra de progresso com trilho escuro, recheio colorido e pinos de ouro
+    nas pontas (igual aos slides da referencia)."""
     frac = max(0.0, min(1.0, frac))
-    pygame.draw.rect(tela, cor_fundo, rect)
+    pygame.draw.rect(tela, CONTORNO, rect.inflate(2, 2), border_radius=5)
+    pygame.draw.rect(tela, cor_fundo, rect, border_radius=4)
     cheio = int((rect.width - 2) * frac)
-    if cheio > 0:
+    if cheio > 1:
         interno = pygame.Rect(rect.left + 1, rect.top + 1, cheio, rect.height - 2)
-        pygame.draw.rect(tela, cor, interno)
-        clara = (min(255, cor[0] + 50), min(255, cor[1] + 50), min(255, cor[2] + 50))
-        pygame.draw.rect(tela, clara, (interno.left, interno.top, cheio, 1))
-    pygame.draw.rect(tela, (10, 10, 16), rect, 1)
+        pygame.draw.rect(tela, cor, interno, border_radius=4)
+        clara = (min(255, cor[0] + 55), min(255, cor[1] + 55), min(255, cor[2] + 55))
+        pygame.draw.line(tela, clara, (interno.left + 2, interno.top),
+                         (interno.right - 3, interno.top), 1)
+    for px in (rect.left - 1, rect.right + 1):
+        pygame.draw.circle(tela, CONTORNO, (px, rect.centery), 4)
+        pygame.draw.circle(tela, OURO, (px, rect.centery), 3)
+        tela.set_at((px - 1, rect.centery - 1), OURO_CLARO)
 
 
 def cursor_selecao(tela, x, y):
     """Setinha de selecao que respira (pra listas de loja etc.)."""
     desloc = int((math.sin(pygame.time.get_ticks() * 0.008) + 1) * 1.5)
-    pygame.draw.polygon(tela, config.AMARELO,
+    pygame.draw.polygon(tela, OURO_CLARO,
                         [(x + desloc, y), (x + desloc, y + 6), (x + 4 + desloc, y + 3)])
 
 
 def separador(tela, x1, x2, y):
-    """Linha divisoria dupla (escura + fio de luz)."""
-    pygame.draw.line(tela, (12, 12, 18), (x1, y), (x2, y), 1)
-    pygame.draw.line(tela, (255, 255, 255, 30), (x1, y + 1), (x2, y + 1), 1)
+    """Linha divisoria dourada com sombrinha."""
+    pygame.draw.line(tela, OURO_ESCURO, (x1, y), (x2, y), 1)
+    pygame.draw.line(tela, (0, 0, 0, 60), (x1, y + 1), (x2, y + 1), 1)
+    for px in (x1, x2):
+        pygame.draw.circle(tela, OURO, (px, y), 2)
 
 
 def surgimento(nasceu_ms, dur=160.0):

@@ -77,7 +77,7 @@ class Loja:
         comum.painel(tela, painel, cor_fundo=(26, 34, 48))
 
         comum.faixa_titulo(tela, self.fonte, "LOJA DA CILA", painel.centerx,
-                           painel.top + 14, config.AZUL_CEU)
+                           painel.top + 2, (150, 200, 240))
 
         # cabecalho: bolsa de ouro e oferta de cura
         pygame.draw.circle(tela, config.AMARELO, (painel.left + 18, painel.top + 33), 4)

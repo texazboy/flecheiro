@@ -78,7 +78,7 @@ class Ferraria:
         comum.painel(tela, painel, cor_fundo=(44, 32, 26))
 
         comum.faixa_titulo(tela, self.fonte, "FERRARIA", painel.centerx,
-                           painel.top + 14, config.LARANJA)
+                           painel.top + 2, config.LARANJA)
 
         # barra da bigorna: quanto da capacidade a selecao otima ocupa
         comum.texto(tela, self.fonte_p, "Bigorna", painel.left + 12, painel.top + 28,

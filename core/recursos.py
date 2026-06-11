@@ -266,53 +266,133 @@ class Recursos:
         return quadros
 
     def _frames_inimigo(self, estado):
+        """Slime: gota arredondada com contorno, brilho e carinha."""
+        corpo = (198, 78, 70)
+        escuro = (118, 38, 38)
         quadros = []
         for sq in (0, 1, 0, -1):  # leve "squash" pra parecer vivo
             s = self._nova(16, 18)
-            altura = 12 - sq
-            topo = 4 + sq
-            pygame.draw.rect(s, config.VERMELHO, (2, topo, 12, altura))
-            pygame.draw.rect(s, (120, 40, 40), (2, topo, 12, altura), 1)
-            pygame.draw.rect(s, config.BRANCO, (5, topo + 3, 2, 2))
-            pygame.draw.rect(s, config.BRANCO, (9, topo + 3, 2, 2))
-            pygame.draw.rect(s, config.PRETO, (5, topo + 3, 1, 1))
-            pygame.draw.rect(s, config.PRETO, (9, topo + 3, 1, 1))
+            alt = 13 - sq
+            topo = 5 + sq
+            corpo_rect = pygame.Rect(1, topo, 14, alt)
+            pygame.draw.ellipse(s, escuro, corpo_rect)                      # contorno
+            pygame.draw.ellipse(s, corpo, corpo_rect.inflate(-2, -2))
+            pygame.draw.ellipse(s, (224, 120, 104),
+                                (corpo_rect.left + 2, corpo_rect.top + 1, 6, 4))  # brilho
+            olho_y = topo + alt // 2 - 2
+            pygame.draw.rect(s, config.BRANCO, (5, olho_y, 2, 3))
+            pygame.draw.rect(s, config.BRANCO, (10, olho_y, 2, 3))
+            pygame.draw.rect(s, config.PRETO, (5, olho_y + 1, 1, 1))
+            pygame.draw.rect(s, config.PRETO, (10, olho_y + 1, 1, 1))
+            pygame.draw.line(s, escuro, (7, olho_y + 4), (9, olho_y + 4), 1)  # boca
             quadros.append(s)
         return quadros
 
     def _frames_voador(self):
-        """Morcego: corpo redondo e asas batendo (2 quadros)."""
+        """Morcego: corpo redondo, orelhinhas e asas batendo (2 quadros)."""
         quadros = []
-        corpo_cor = (110, 80, 140)
-        asa_cor = (80, 58, 104)
+        corpo_cor = (118, 86, 150)
+        asa_cor = (82, 60, 108)
+        contorno = (44, 30, 60)
         for asas_cima in (True, False):
             s = self._nova(16, 12)
             if asas_cima:
-                pygame.draw.polygon(s, asa_cor, [(0, 1), (6, 6), (3, 8)])
-                pygame.draw.polygon(s, asa_cor, [(16, 1), (10, 6), (13, 8)])
+                asas = [[(0, 1), (6, 6), (3, 8)], [(16, 1), (10, 6), (13, 8)]]
             else:
-                pygame.draw.polygon(s, asa_cor, [(0, 10), (6, 5), (3, 4)])
-                pygame.draw.polygon(s, asa_cor, [(16, 10), (10, 5), (13, 4)])
+                asas = [[(0, 10), (6, 5), (3, 4)], [(16, 10), (10, 5), (13, 4)]]
+            for poly in asas:
+                pygame.draw.polygon(s, asa_cor, poly)
+                pygame.draw.polygon(s, contorno, poly, 1)
+            pygame.draw.ellipse(s, contorno, (4, 2, 8, 9))     # contorno do corpo
             pygame.draw.ellipse(s, corpo_cor, (5, 3, 6, 7))
+            pygame.draw.polygon(s, corpo_cor, [(5, 4), (6, 1), (7, 4)])   # orelha
+            pygame.draw.polygon(s, corpo_cor, [(9, 4), (10, 1), (11, 4)])
             pygame.draw.rect(s, config.BRANCO, (6, 5, 1, 1))
             pygame.draw.rect(s, config.BRANCO, (9, 5, 1, 1))
             quadros.append(s)
         return quadros
 
+    # --- coisas do mundo: bau, moeda e placa ---
+    def sprite_bau(self, aberto):
+        chave = "bau_aberto" if aberto else "bau_fechado"
+        if chave not in self._cache_img:
+            img = self._tentar_png(chave) or self._placeholder_bau(aberto)
+            self._cache_img[chave] = self._escalar_para_altura(img, 13)
+        return self._cache_img[chave]
+
+    def _placeholder_bau(self, aberto):
+        s = self._nova(16, 13)
+        madeira = (134, 92, 52)
+        escuro = (74, 48, 28)
+        ouro = (224, 178, 80)
+        if aberto:
+            pygame.draw.rect(s, escuro, (1, 0, 14, 4))           # tampa levantada
+            pygame.draw.rect(s, madeira, (2, 0, 12, 3))
+            pygame.draw.rect(s, (24, 18, 14), (2, 5, 12, 3))     # interior escuro
+            pygame.draw.rect(s, ouro, (4, 5, 2, 2))              # tesouro brilhando
+            pygame.draw.rect(s, ouro, (9, 6, 2, 2))
+            pygame.draw.rect(s, escuro, (1, 4, 14, 9), 1)
+            pygame.draw.rect(s, madeira, (2, 8, 12, 4))
+        else:
+            pygame.draw.rect(s, escuro, (1, 2, 14, 11))          # contorno
+            pygame.draw.rect(s, madeira, (2, 3, 12, 9))
+            pygame.draw.rect(s, escuro, (2, 6, 12, 1))           # vinco da tampa
+            pygame.draw.rect(s, ouro, (7, 5, 2, 4))              # fecho
+            pygame.draw.rect(s, (160, 120, 70), (2, 3, 12, 1))   # luz na tampa
+        return s
+
+    def sprite_moeda(self):
+        if "moeda" not in self._cache_img:
+            img = self._tentar_png("moeda") or self._placeholder_moeda()
+            self._cache_img["moeda"] = self._escalar_para_altura(img, 7)
+        return self._cache_img["moeda"]
+
+    def _placeholder_moeda(self):
+        s = self._nova(7, 7)
+        pygame.draw.circle(s, (150, 110, 40), (3, 3), 3)
+        pygame.draw.circle(s, config.AMARELO, (3, 3), 2)
+        s.set_at((2, 2), (255, 240, 180))
+        return s
+
+    def sprite_placa(self):
+        if "placa" not in self._cache_img:
+            img = self._tentar_png("placa") or self._placeholder_placa()
+            self._cache_img["placa"] = self._escalar_para_altura(img, 16)
+        return self._cache_img["placa"]
+
+    def _placeholder_placa(self):
+        s = self._nova(16, 16)
+        madeira = (134, 92, 52)
+        escuro = (74, 48, 28)
+        pygame.draw.rect(s, escuro, (7, 8, 2, 8))                # poste
+        pygame.draw.rect(s, escuro, (1, 1, 14, 8))               # contorno da tabua
+        pygame.draw.rect(s, madeira, (2, 2, 12, 6))
+        pygame.draw.line(s, escuro, (4, 4), (11, 4), 1)          # "escrita"
+        pygame.draw.line(s, escuro, (4, 6), (9, 6), 1)
+        return s
+
     # --- tiles placeholder ---
     def _placeholder_tile_terra(self):
         s = pygame.Surface((16, 16))
         s.fill((96, 68, 46))
+        # salpicos em dois tons + uma pedrinha clara, pra dar textura
         for px, py in [(3, 4), (10, 7), (6, 11), (13, 13), (1, 9)]:
             pygame.draw.rect(s, (78, 54, 36), (px, py, 2, 2))
+        for px, py in [(8, 2), (2, 14), (12, 10)]:
+            pygame.draw.rect(s, (110, 80, 56), (px, py, 1, 1))
+        pygame.draw.rect(s, (122, 96, 74), (5, 7, 2, 1))
         return s
 
     def _placeholder_tile_grama(self):
         s = self._placeholder_tile_terra().copy()
-        pygame.draw.rect(s, config.VERDE_ESCURO, (0, 0, 16, 5))
+        pygame.draw.rect(s, (50, 96, 60), (0, 3, 16, 3))         # transicao escura
+        pygame.draw.rect(s, config.VERDE_ESCURO, (0, 1, 16, 3))
         pygame.draw.rect(s, config.VERDE, (0, 0, 16, 2))
+        pygame.draw.rect(s, (138, 208, 130), (0, 0, 16, 1))      # fio de luz no topo
         for px in (2, 7, 12):
-            pygame.draw.rect(s, config.VERDE, (px, 2, 1, 2))
+            pygame.draw.rect(s, config.VERDE, (px, 2, 1, 3))
+        for px in (5, 10, 14):
+            s.set_at((px, 1), (138, 208, 130))
         return s
 
     def _placeholder_tile_plataforma(self):

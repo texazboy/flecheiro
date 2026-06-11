@@ -141,6 +141,8 @@ def _gerar_tudo():
                            _tom(587, 0.30, "tri", 0.16, 2)))
     s["clique"] = _som(_tom(880, 0.03, "quad", 0.16, 3))
     s["pronto"] = _som(_seq(_tom(990, 0.04, "quad", 0.18, 3), _tom(1319, 0.07, "quad", 0.18, 3)))
+    s["bau"] = _som(_seq(_tom(170, 0.10, "quad", 0.30, 4),
+                         _tom(1047, 0.06, "tri", 0.24, 3), _tom(1568, 0.10, "tri", 0.24, 3)))
 
     # musiquinhas de fundo (frases curtas em la menor, tocadas em loop)
     vila = _frase([220, 0, 262, 330, 392, 330, 262, 0,

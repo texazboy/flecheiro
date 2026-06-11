@@ -62,13 +62,14 @@ class HUD:
 
     @staticmethod
     def _fazer_placa(largura, altura):
-        """Plaquinha translucida que segura os dados (legivel em qualquer fundo)."""
+        """Plaquinha com fio dourado (mesma familia visual dos paineis)."""
         s = pygame.Surface((largura, altura), pygame.SRCALPHA)
-        s.fill((12, 14, 24, 150))
-        vazio = (0, 0, 0, 0)
-        for px, py in ((0, 0), (largura - 1, 0), (0, altura - 1), (largura - 1, altura - 1)):
-            s.set_at((px, py), vazio)
-        pygame.draw.line(s, (255, 255, 255, 28), (1, 0), (largura - 2, 0), 1)
+        pygame.draw.rect(s, (28, 20, 18, 220), (0, 0, largura, altura), border_radius=5)
+        pygame.draw.rect(s, (16, 16, 26, 165), (1, 1, largura - 2, altura - 2),
+                         border_radius=4)
+        pygame.draw.rect(s, (198, 148, 70, 200), (1, 1, largura - 2, altura - 2),
+                         width=1, border_radius=4)
+        pygame.draw.line(s, (238, 200, 124, 90), (4, 1), (largura - 5, 1), 1)
         return s
 
     @staticmethod

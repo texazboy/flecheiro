@@ -51,6 +51,15 @@ def _mistura(a, b, f):
             int(a[2] + (b[2] - a[2]) * f))
 
 
+def _borrar(superficie, fator):
+    """Desfoque barato: encolhe e amplia de volta (suaviza tudo).
+    Usado nas camadas distantes pra dar profundidade de campo."""
+    w, h = superficie.get_size()
+    pequena = pygame.transform.smoothscale(superficie, (max(1, w // fator),
+                                                        max(1, h // fator)))
+    return pygame.transform.smoothscale(pequena, (w, h))
+
+
 class Fundo:
     """Ceu + parallax. Criar uma vez por fase e chamar desenhar() por frame."""
 
@@ -60,14 +69,21 @@ class Fundo:
         rnd = random.Random(semente * 31 + 7)
         self.ceu = self._montar_ceu(rnd)
         self.img_extra = recursos.fundo_img()   # fundo.png do usuario, se houver
-        # camadas de montanha: (surface, fator de parallax)
+        # camadas de montanha: (surface, fator de parallax). As distantes vao
+        # desfocadas (profundidade de campo, estilo HD-2D).
         fatores = (0.22, 0.42, 0.65)
         bases = (148, 172, 198)
         amps = (24, 18, 12)
+        borroes = (3, 2, 1)
         self.camadas = []
-        for cor, fator, base, amp in zip(self.tema["camadas"], fatores, bases, amps):
-            self.camadas.append((self._montar_morros(cor, base, amp, rnd), fator))
+        for cor, fator, base, amp, borrao in zip(self.tema["camadas"], fatores,
+                                                 bases, amps, borroes):
+            img = self._montar_morros(cor, base, amp, rnd)
+            if borrao > 1:
+                img = _borrar(img, borrao)
+            self.camadas.append((img, fator))
         self.nuvens = self._montar_nuvens(rnd) if self.tema["nuvens"] else []
+        self.raios = self._montar_raios() if tema == "dia" else None
 
     # ------------------------------------------------------------ construcao
     def _montar_ceu(self, rnd):
@@ -126,6 +142,16 @@ class Fundo:
                 pygame.draw.polygon(s, escura, [(px - 4, py + 2), (px + 4, py + 2), (px, py - h)])
         return s
 
+    def _montar_raios(self):
+        """Feixes de luz diagonais (god rays), bem suaves, pro tema de dia."""
+        s = pygame.Surface((config.LARGURA, config.ALTURA))
+        for x_topo, larg in ((40, 34), (150, 22), (270, 40), (390, 26)):
+            pygame.draw.polygon(s, (16, 14, 9),
+                                [(x_topo, -10), (x_topo + larg, -10),
+                                 (x_topo + larg - 70, config.ALTURA + 10),
+                                 (x_topo - 70, config.ALTURA + 10)])
+        return _borrar(s, 4)
+
     def _montar_nuvens(self, rnd):
         nuvens = []
         cor = self.tema["cor_nuvem"]
@@ -165,10 +191,31 @@ class Fundo:
             if dx < config.LARGURA:
                 tela.blit(img, (dx, 0))
 
+        if self.raios is not None:
+            balanco = int(math.sin(agora * 0.25) * 5)
+            tela.blit(self.raios, (balanco, 0), special_flags=pygame.BLEND_RGB_ADD)
+
 
 # ---------------------------------------------------------------------------
 # Terreno: a fase inteira (chao + plataformas + decoracao) numa superficie so.
 # ---------------------------------------------------------------------------
+def _arvore(sup, x, base_y, rnd):
+    """Arvore de copa redonda em tres tons, com contorno (fica atras do jogo)."""
+    alt = rnd.randint(40, 58)
+    topo = base_y - alt
+    contorno = (26, 42, 30)
+    escuro = (46, 90, 56)
+    medio = (64, 122, 66)
+    claro = (92, 156, 80)
+    # tronco
+    pygame.draw.rect(sup, (62, 44, 30), (x - 3, base_y - 18, 6, 18))
+    pygame.draw.rect(sup, (88, 62, 40), (x - 2, base_y - 18, 2, 18))
+    # copa: tres bolhas empilhadas com luz vindo de cima/esquerda
+    larg = rnd.randint(30, 40)
+    pygame.draw.ellipse(sup, contorno, (x - larg // 2 - 1, topo - 1, larg + 2, alt - 12 + 2))
+    pygame.draw.ellipse(sup, escuro, (x - larg // 2, topo, larg, alt - 12))
+    pygame.draw.ellipse(sup, medio, (x - larg // 2 + 2, topo + 2, larg - 7, alt - 18))
+    pygame.draw.ellipse(sup, claro, (x - larg // 2 + 4, topo + 3, larg // 2 - 2, (alt - 18) // 2))
 def montar_terreno(largura_mundo, solidos, plataformas, recursos, semente=1, tema="dia"):
     """Pre-renderiza o chao da fase inteira. Devolve (superficie, luzes_fixas):
     as luzes sao a posicao dos cogumelos luminosos que nascem de noite, pra
@@ -180,20 +227,34 @@ def montar_terreno(largura_mundo, solidos, plataformas, recursos, semente=1, tem
     rnd = random.Random(semente)
     luzes_fixas = []
 
+    # duas variantes de cada tile (a espelhada sai de graca) quebram a repeticao
+    gramas = (grama, pygame.transform.flip(grama, True, False))
+    terras = (terra, pygame.transform.flip(terra, True, False))
+
     clip_antigo = sup.get_clip()
     for s in solidos:
         sup.set_clip(s)
         for tx in range(s.left - s.left % 16, s.right, 16):
-            sup.blit(grama, (tx, s.top))
+            sup.blit(gramas[rnd.randint(0, 1)], (tx, s.top))
             ty = s.top + 16
             while ty < s.bottom:
-                sup.blit(terra, (tx, ty))
+                sup.blit(terras[rnd.randint(0, 1)], (tx, ty))
                 ty += 16
     for p in plataformas:
         sup.set_clip(p)
         for tx in range(p.left - p.left % 16, p.right, 16):
             sup.blit(tabua, (tx, p.top))
     sup.set_clip(clip_antigo)
+
+    # arvores ao fundo do caminho (densidade estilo cenario de RPG)
+    for s in solidos:
+        if s.width < 200:
+            continue
+        x = s.left + 130
+        while x < s.right - 150:
+            if rnd.random() < 0.6:
+                _arvore(sup, x, s.top, rnd)
+            x += rnd.randint(150, 300)
 
     # decoracao em cima do chao: tufos, flores, pedrinhas, arbustos e, de
     # noite, cogumelos que brilham (viram fonte de luz na fase)

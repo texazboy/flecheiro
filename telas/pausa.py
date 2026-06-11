@@ -45,10 +45,9 @@ class Pausa:
         painel = pygame.Rect(94, 30 + desloc, config.LARGURA - 188, config.ALTURA - 60)
         comum.painel(tela, painel)
 
-        comum.faixa_titulo(tela, self.fonte, "PAUSA", painel.centerx, painel.top + 16)
-        comum.separador(tela, painel.left + 10, painel.right - 10, painel.top + 30)
+        comum.faixa_titulo(tela, self.fonte, "PAUSA", painel.centerx, painel.top + 2)
 
-        y = painel.top + 40
+        y = painel.top + 26
         for tecla_txt, acao in _CONTROLES:
             r = comum.keycap(tela, self.fonte_p, tecla_txt, painel.left + 14, y)
             comum.texto(tela, self.fonte_p, acao, r.right + 8, y + 1, config.BRANCO)
