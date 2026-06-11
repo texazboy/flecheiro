@@ -31,6 +31,10 @@ SPRITES SIMPLES (1 quadro)
   npc_ferreiro.png     NPCs da vila (~24px de altura). Diferencie os tres:
   npc_lojista.png      ferreiro (avental/martelo), lojista (avental/chapeu),
   npc_aldeao.png       aldeao (comum).
+  bau_fechado.png      bau de tesouro fechado (~16x13)
+  bau_aberto.png       bau de tesouro aberto
+  moeda.png            moedinha (~7px)
+  placa.png            placa de aviso (~16px)
 
 ANIMACOES (spritesheet = tira HORIZONTAL de quadros)
 ----------------------------------------------------

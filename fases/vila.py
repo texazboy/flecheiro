@@ -88,6 +88,7 @@ class Vila(Estado):
 
         self.particulas = []
         self._timer_fumaca = 0.0
+        self._sombras = {}
         self.vagalumes = [dict(x=random.uniform(60, self.largura_mundo - 60),
                                y=random.uniform(150, 225),
                                defasagem=random.uniform(0, math.tau))
@@ -130,6 +131,16 @@ class Vila(Estado):
         pygame.draw.line(sup, (60, 46, 38), (janela.centerx, janela.top),
                          (janela.centerx, janela.bottom - 1), 1)
         self.luzes_fixas.append((janela.centerx, janela.centery, 36, (255, 205, 130)))
+
+    def _sombra(self, tela, rect_mundo):
+        larg = rect_mundo.width + 4
+        s = self._sombras.get(larg)
+        if s is None:
+            s = pygame.Surface((larg, 4), pygame.SRCALPHA)
+            pygame.draw.ellipse(s, (0, 0, 0, 70), (0, 0, larg, 4))
+            self._sombras[larg] = s
+        r = self.camera.aplicar(rect_mundo)
+        tela.blit(s, (r.centerx - larg // 2, r.bottom - 2))
 
     def _desenhar_poste(self, sup, x):
         chao = self.chao_y
@@ -223,6 +234,12 @@ class Vila(Estado):
 
         for p in self.particulas:
             p.desenhar(tela, self.camera)
+
+        # sombras de contato (aterra todo mundo no chao)
+        for npc in self.npcs:
+            self._sombra(tela, npc.rect)
+        if self.jogador.no_chao:
+            self._sombra(tela, self.jogador.rect)
 
         # o aviso [E] some enquanto um dialogo/loja esta aberto
         proximo = self._npc_proximo() if self.overlay is None else None

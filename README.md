@@ -59,9 +59,11 @@ escala a parede da fase 2 e se atravessam os vãos da fase 3 (a flecha fincada
 na beirada funciona de ponte).
 
 São **três fases** (dia, poente e noite), com a vila entre elas. Inimigos
-terrestres patrulham o chão e morcegos rondam os pontos altos. Os efeitos
-sonoros e a música de fundo são gerados pelo próprio código (sem arquivos de
-áudio).
+terrestres patrulham o chão e morcegos rondam os pontos altos. Derrotar
+inimigos solta **moedas** (coleta automática, com efeito ímã) além dos
+materiais; **baús de tesouro** escondidos nos pontos altos guardam materiais
+raros, e **placas** pelo caminho dão dicas (leia com `E`). Os efeitos sonoros
+e a música de fundo são gerados pelo próprio código (sem arquivos de áudio).
 
 ## Algoritmos implementados (e onde aparecem)
 

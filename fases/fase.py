@@ -26,7 +26,7 @@ from core.cenario import Fundo, montar_terreno
 from core.luz import Luzes, AMBIENTE
 from entidades.jogador import Jogador
 from entidades.inimigo import Inimigo, InimigoVoador
-from entidades.item import ItemNoChao, MATERIAIS
+from entidades.item import ItemNoChao, Moeda, Bau, MATERIAIS
 from entidades.efeitos import explosao, faisca, poeira, Onda, TextoFlutuante
 from telas.hud import HUD
 from telas.tela_inventario import TelaInventario
@@ -59,6 +59,9 @@ def _layout(numero):
         itens = [("couro", 650, 226), ("madeira", 1250, 226),
                  ("madeira", 320, 186), ("pena", 470, 156),
                  ("cristal", 866, 86), ("ferro", 884, 86)]
+        baus = [(900, 95, ("ferro", "couro"))]          # premio da plataforma alta
+        placas = [(140, "Atire flechas nas paredes: da pra subir em cima delas!"),
+                  (840, "A plataforma la em cima guarda um bau. Escale com flechas.")]
         dica = "Segure o mouse pra tensionar o arco  |  E coleta  |  T rota  |  I inventario"
     elif numero == 2:
         largura = 1700
@@ -76,6 +79,8 @@ def _layout(numero):
                     ("chao", "ferro", 1120, 60), ("chao", "cristal", 1460, 50)]
         itens = [("ferro", 250, 226), ("madeira", 360, 168),
                  ("couro", 1080, 162), ("cristal", 1300, 128)]
+        baus = [(792, 90, ("cristal", "pena"))]         # no topo da parede
+        placas = [(700, "Parede alta demais? Finque flechas nela e use de escada.")]
         dica = "A parede bloqueia o caminho: finque flechas nela e suba!"
     else:
         largura = 2000
@@ -98,11 +103,15 @@ def _layout(numero):
                     ("voo", "pena", 1450, 80), ("chao", "cristal", 1700, 80)]
         itens = [("ferro", 250, 226), ("cristal", 912, 106), ("madeira", 740, 152),
                  ("couro", 1280, 162), ("cristal", 1512, 76), ("ferro", 1900, 226)]
+        baus = [(1660, 140, ("cristal", "ferro"))]      # na plataforma alta final
+        placas = [(450, "Vaos a frente! Uma flecha fincada na beirada vira ponte."),
+                  (1180, "Falta pouco. As tochas marcam o caminho.")]
         dica = "Noite fechada: cuidado com os vaos - a flecha fincada vira ponte!"
 
     porta = pygame.Rect(largura - 80, chao_y - 60, 24, 60)
     return dict(largura=largura, solidos=solidos, plataformas=plataformas,
-                inimigos=inimigos, itens=itens, porta=porta, chao_y=chao_y, dica=dica)
+                inimigos=inimigos, itens=itens, baus=baus, placas=placas,
+                porta=porta, chao_y=chao_y, dica=dica)
 
 
 class Fase(Estado):
@@ -126,6 +135,11 @@ class Fase(Estado):
         self.inimigos = [self._criar_inimigo(d) for d in dados["inimigos"]]
         self.itens = [ItemNoChao(x, y, MATERIAIS[ch], self.recursos)
                       for (ch, x, y) in dados["itens"]]
+        self.baus = [Bau(x, y, conteudo, self.recursos)
+                     for (x, y, conteudo) in dados["baus"]]
+        self.placas = [(pygame.Rect(x - 10, self.chao_y - 18, 20, 18), txt)
+                       for (x, txt) in dados["placas"]]
+        self.moedas = []
         self.flechas = []
         self.particulas = []
         self.textos = []
@@ -149,6 +163,15 @@ class Fase(Estado):
                 pygame.draw.rect(self.terreno, (70, 54, 40), (tx - 1, ty - 12, 2, 13))
                 pygame.draw.rect(self.terreno, (255, 180, 80), (tx - 2, ty - 16, 4, 5))
                 pygame.draw.rect(self.terreno, (255, 230, 150), (tx - 1, ty - 15, 2, 2))
+
+        # placas de aviso e uns barris fazendo companhia pra porta
+        sprite_placa = self.recursos.sprite_placa()
+        for r, _txt in self.placas:
+            self.terreno.blit(sprite_placa, (r.centerx - 8, self.chao_y - 16))
+        self._desenhar_barris(self.porta.left - 22, self.chao_y)
+
+        # cache das sombras de contato (elipse escura nos pes)
+        self._sombras = {}
 
         self.overlay = None
         self.mostrar_rota = False
@@ -189,6 +212,30 @@ class Fase(Estado):
             return InimigoVoador(x, extra, self.recursos, dropa=drop)
         return Inimigo(x, self.chao_y - 18, self.recursos, dropa=drop, alcance=extra)
 
+    def _desenhar_barris(self, x, chao):
+        """Barril + caixote encostados na saida (cantinho de bagagem)."""
+        t = self.terreno
+        pygame.draw.rect(t, (66, 44, 28), (x, chao - 14, 12, 14))        # barril
+        pygame.draw.rect(t, (108, 74, 44), (x + 1, chao - 13, 10, 12))
+        pygame.draw.line(t, (60, 40, 26), (x + 1, chao - 10), (x + 10, chao - 10), 1)
+        pygame.draw.line(t, (60, 40, 26), (x + 1, chao - 5), (x + 10, chao - 5), 1)
+        cx = x - 13
+        pygame.draw.rect(t, (66, 44, 28), (cx, chao - 11, 12, 11))       # caixote
+        pygame.draw.rect(t, (120, 86, 52), (cx + 1, chao - 10, 10, 9))
+        pygame.draw.line(t, (66, 44, 28), (cx + 1, chao - 10), (cx + 10, chao - 2), 1)
+        pygame.draw.line(t, (66, 44, 28), (cx + 10, chao - 10), (cx + 1, chao - 2), 1)
+
+    def _sombra(self, tela, rect_mundo):
+        """Elipse de sombra nos pes (igual jogo HD-2D, aterra os sprites)."""
+        larg = rect_mundo.width + 4
+        s = self._sombras.get(larg)
+        if s is None:
+            s = pygame.Surface((larg, 4), pygame.SRCALPHA)
+            pygame.draw.ellipse(s, (0, 0, 0, 70), (0, 0, larg, 4))
+            self._sombras[larg] = s
+        r = self.camera.aplicar(rect_mundo)
+        tela.blit(s, (r.centerx - larg // 2, r.bottom - 2))
+
     def _fazer_brilho_porta(self):
         s = pygame.Surface((72, 88), pygame.SRCALPHA)
         for raio, alfa in ((34, 18), (24, 32), (15, 48)):
@@ -224,7 +271,7 @@ class Fase(Estado):
                 if self.mostrar_rota:
                     self._recalcular_rota()
             elif evento.key == pygame.K_e:
-                self._coletar_proximos()
+                self._interagir()
             elif evento.key in (pygame.K_ESCAPE, pygame.K_p):
                 self.carregando = False
                 self.overlay = Pausa(self.recursos)
@@ -287,6 +334,9 @@ class Fase(Estado):
             inim.atualizar(dt, self)
             if inim.morto:
                 self._dropar(inim)
+                for _ in range(random.randint(2, 3)):
+                    self.moedas.append(Moeda(inim.rect.centerx, inim.rect.centery,
+                                             self.recursos))
                 self.particulas += explosao(inim.rect.centerx, inim.rect.centery,
                                             config.VERMELHO, 12)
                 self.ondas.append(Onda(inim.rect.centerx, inim.rect.centery, 20))
@@ -301,6 +351,15 @@ class Fase(Estado):
 
         for it in self.itens:
             it.atualizar(dt)
+
+        # moedas: fisica + ima + coleta automatica
+        for m in self.moedas:
+            m.atualizar(dt, self, self.jogador)
+            if m.coletada:
+                self.mundo.ouro += 1
+                som.tocar("moeda", 0.5)
+                self.particulas.append(faisca(m.x, m.y, config.AMARELO))
+        self.moedas = [m for m in self.moedas if not m.sumiu]
 
         # fagulhas na porta de saida, pra ela chamar o jogador de longe
         self._timer_porta += dt
@@ -363,6 +422,33 @@ class Fase(Estado):
             f.morta = True
         if excedente > 0:
             self.flechas = [f for f in self.flechas if not f.morta]
+
+    def _interagir(self):
+        """Tecla E: abre bau perto, le placa perto, ou coleta itens."""
+        jrect = self.jogador.rect
+        for bau in self.baus:
+            if not bau.aberto and jrect.colliderect(bau.rect.inflate(20, 16)):
+                self._abrir_bau(bau)
+                return
+        for placa_rect, txt in self.placas:
+            if jrect.colliderect(placa_rect.inflate(16, 8)):
+                from telas.dialogo import Dialogo
+                self.carregando = False
+                self.overlay = Dialogo("Placa", [txt], self.recursos)
+                return
+        self._coletar_proximos()
+
+    def _abrir_bau(self, bau):
+        bau.abrir()
+        som.tocar("bau")
+        cx, cy = bau.rect.centerx, bau.rect.top
+        self.ondas.append(Onda(cx, cy, 16, (255, 230, 150), 0.25))
+        self.particulas += explosao(cx, cy, config.AMARELO, 10)
+        for chave in bau.conteudo:
+            self.itens.append(ItemNoChao(cx + random.randint(-14, 14), cy - 6,
+                                         MATERIAIS[chave], self.recursos))
+        for _ in range(4):
+            self.moedas.append(Moeda(cx, cy - 4, self.recursos))
 
     def _coletar_proximos(self):
         """Coleta (tecla E) os itens que estiverem perto do jogador."""
@@ -480,8 +566,23 @@ class Fase(Estado):
         for f in self.folhas:
             px, py = self.camera.aplicar_ponto((f["x"], f["y"]))
             pygame.draw.rect(tela, f["cor"], (int(px), int(py), 2, 2))
+
+        # sombras de contato antes de todo mundo (aterra os sprites no chao);
+        # morcego nao tem: esta voando
+        if self.jogador.no_chao:
+            self._sombra(tela, self.jogador.rect)
+        for inim in self.inimigos:
+            if isinstance(inim, Inimigo):
+                self._sombra(tela, inim.rect)
+        for bau in self.baus:
+            self._sombra(tela, bau.rect)
+
+        for bau in self.baus:
+            bau.desenhar(tela, self.camera)
         for it in self.itens:
             it.desenhar(tela, self.camera)
+        for m in self.moedas:
+            m.desenhar(tela, self.camera)
         for inim in self.inimigos:
             inim.desenhar(tela, self.camera)
         for f in self.flechas:
