@@ -25,10 +25,14 @@ VEL_ANDAR = 2.2
 FORCA_PULO = 8.5
 
 # --- Flecha ---
-FORCA_FLECHA = 9.0               # velocidade inicial do disparo
+FORCA_FLECHA = 9.0               # velocidade maxima do disparo (arco tensionado)
 GRAVIDADE_FLECHA = 0.22
 MAX_FLECHAS_FINCADAS = 12        # limite de plataformas-flecha simultaneas
 COMP_FLECHA = 14                 # comprimento visual da flecha
+TEMPO_CARGA = 0.6                # segundos segurando o mouse pra tensao maxima
+
+# --- Efeitos ---
+PARTICULAS_MAX = 240             # teto de particulas vivas por fase
 
 # --- Cores (paleta simples) ---
 PRETO = (18, 18, 24)

@@ -12,6 +12,7 @@ Convencoes de nome em assets/:
   - animacao       : <base>_<estado>_<qtd>.png  (tira horizontal com <qtd> quadros)
                      ex.: jogador_andar_6.png  (6 quadros lado a lado)
                      ou   <base>_<estado>.png   (quadros QUADRADOS, qtd deduzida)
+                     bases usadas: jogador, inimigo, voador
   - tiles          : tile_grama.png, tile_terra.png, tile_plataforma.png (16x16)
   - fundo          : fundo.png (camada distante, opcional)
 """
@@ -71,14 +72,14 @@ class Recursos:
     def sprite_item(self, material):
         chave = "item_" + material.chave
         if chave not in self._cache_img:
-            img = self._tentar_png(chave) or self._placeholder_item(material.cor)
+            img = self._tentar_png(chave) or self._placeholder_item(material)
             self._cache_img[chave] = self._escalar_para_altura(img, 12)
         return self._cache_img[chave]
 
     def sprite_npc(self, tipo, cor):
         chave = "npc_" + tipo
         if chave not in self._cache_img:
-            img = self._tentar_png(chave) or self._placeholder_npc(cor)
+            img = self._tentar_png(chave) or self._placeholder_npc(tipo, cor)
             self._cache_img[chave] = self._escalar_para_altura(img, 24)
         return self._cache_img[chave]
 
@@ -147,23 +148,64 @@ class Recursos:
         pygame.draw.polygon(s, config.CINZA, [(config.COMP_FLECHA - 4, 0),
                                               (config.COMP_FLECHA, 2),
                                               (config.COMP_FLECHA - 4, 4)])
-        pygame.draw.rect(s, config.BRANCO, (0, 0, 2, 4))
+        pygame.draw.rect(s, config.VERMELHO, (0, 0, 1, 4))
+        pygame.draw.rect(s, config.BRANCO, (1, 0, 1, 4))
         return s
 
-    def _placeholder_item(self, cor):
+    def _placeholder_item(self, material):
+        """Cada material tem uma forma propria, pra dar pra reconhecer de longe."""
         s = self._nova(12, 12)
-        pygame.draw.polygon(s, cor, [(6, 0), (12, 6), (6, 12), (0, 6)])
-        pygame.draw.polygon(s, config.BRANCO, [(6, 0), (12, 6), (6, 12), (0, 6)], 1)
-        pygame.draw.rect(s, config.BRANCO, (5, 3, 2, 2))
+        ch = material.chave
+        if ch == "madeira":
+            # tora deitada com aneis
+            pygame.draw.rect(s, config.MARROM, (1, 4, 10, 5))
+            pygame.draw.rect(s, config.MARROM_CLARO, (0, 4, 2, 5))
+            pygame.draw.rect(s, (84, 58, 38), (10, 4, 2, 5))
+            pygame.draw.line(s, (84, 58, 38), (4, 5), (4, 8), 1)
+            pygame.draw.line(s, (84, 58, 38), (7, 5), (7, 8), 1)
+        elif ch == "ferro":
+            # lingote
+            pygame.draw.polygon(s, config.CINZA, [(2, 9), (4, 4), (10, 4), (12, 9)])
+            pygame.draw.line(s, config.BRANCO, (4, 5), (9, 5), 1)
+            pygame.draw.line(s, (70, 74, 86), (2, 9), (12, 9), 1)
+        elif ch == "couro":
+            # pele dobrada com costura
+            pygame.draw.rect(s, config.MARROM_CLARO, (1, 4, 10, 6))
+            pygame.draw.rect(s, config.MARROM, (1, 4, 10, 2))
+            for px in (3, 6, 9):
+                pygame.draw.rect(s, (84, 58, 38), (px, 8, 1, 1))
+        elif ch == "pena":
+            # pena na diagonal
+            pygame.draw.polygon(s, config.BRANCO, [(2, 10), (8, 2), (10, 4), (4, 11)])
+            pygame.draw.line(s, config.CINZA, (3, 10), (9, 3), 1)
+        elif ch == "cristal":
+            # gema lapidada
+            pygame.draw.polygon(s, config.ROXO, [(6, 0), (11, 5), (9, 11), (3, 11), (1, 5)])
+            pygame.draw.line(s, (200, 170, 235), (6, 0), (6, 11), 1)
+            pygame.draw.line(s, (200, 170, 235), (1, 5), (11, 5), 1)
+            pygame.draw.rect(s, config.BRANCO, (4, 2, 2, 2))
+        else:
+            pygame.draw.polygon(s, material.cor, [(6, 0), (12, 6), (6, 12), (0, 6)])
+            pygame.draw.polygon(s, config.BRANCO, [(6, 0), (12, 6), (6, 12), (0, 6)], 1)
         return s
 
-    def _placeholder_npc(self, cor):
+    def _placeholder_npc(self, tipo, cor):
         s = self._nova(16, 24)
         pele = (224, 178, 140)
-        pygame.draw.rect(s, pele, (5, 1, 6, 6))
-        pygame.draw.rect(s, cor, (4, 7, 8, 11))
-        pygame.draw.rect(s, (60, 50, 40), (4, 18, 3, 6))
+        pygame.draw.rect(s, pele, (5, 1, 6, 6))            # cabeca
+        pygame.draw.rect(s, cor, (4, 7, 8, 11))            # roupa
+        pygame.draw.rect(s, (60, 50, 40), (4, 18, 3, 6))   # pernas
         pygame.draw.rect(s, (60, 50, 40), (9, 18, 3, 6))
+        if tipo == "ferreiro":
+            pygame.draw.rect(s, (70, 70, 78), (5, 10, 6, 7))     # avental
+            pygame.draw.rect(s, config.MARROM, (13, 8, 1, 7))    # cabo do martelo
+            pygame.draw.rect(s, config.CINZA, (12, 6, 3, 3))     # cabeca do martelo
+        elif tipo == "lojista":
+            pygame.draw.rect(s, config.MARROM, (3, 1, 10, 1))    # aba do chapeu
+            pygame.draw.rect(s, config.MARROM, (5, 0, 6, 2))     # copa
+        elif tipo == "aldeao":
+            pygame.draw.rect(s, config.BRANCO, (5, 6, 6, 2))     # barba
+            pygame.draw.rect(s, config.MARROM, (14, 12, 1, 12))  # bengala
         return s
 
     # --- animacoes placeholder ---
@@ -172,6 +214,8 @@ class Recursos:
             return self._frames_jogador(estado)
         if base == "inimigo":
             return self._frames_inimigo(estado)
+        if base == "voador":
+            return self._frames_voador()
         return [self._nova(16, 16)]
 
     def _frames_jogador(self, estado):
@@ -212,12 +256,12 @@ class Recursos:
             quadros.append(s)
         else:  # parado
             for dy in (0, 1):
-                base = corpo()
-                pygame.draw.rect(base, capuz, (4, 17, 3, 7))
-                pygame.draw.rect(base, capuz, (9, 17, 3, 7))
-                pygame.draw.rect(base, pele, (11, 9, 3, 2))
+                base_img = corpo()
+                pygame.draw.rect(base_img, capuz, (4, 17, 3, 7))
+                pygame.draw.rect(base_img, capuz, (9, 17, 3, 7))
+                pygame.draw.rect(base_img, pele, (11, 9, 3, 2))
                 s = self._nova(16, 24)
-                s.blit(base, (0, dy))
+                s.blit(base_img, (0, dy))
                 quadros.append(s)
         return quadros
 
@@ -233,6 +277,25 @@ class Recursos:
             pygame.draw.rect(s, config.BRANCO, (9, topo + 3, 2, 2))
             pygame.draw.rect(s, config.PRETO, (5, topo + 3, 1, 1))
             pygame.draw.rect(s, config.PRETO, (9, topo + 3, 1, 1))
+            quadros.append(s)
+        return quadros
+
+    def _frames_voador(self):
+        """Morcego: corpo redondo e asas batendo (2 quadros)."""
+        quadros = []
+        corpo_cor = (110, 80, 140)
+        asa_cor = (80, 58, 104)
+        for asas_cima in (True, False):
+            s = self._nova(16, 12)
+            if asas_cima:
+                pygame.draw.polygon(s, asa_cor, [(0, 1), (6, 6), (3, 8)])
+                pygame.draw.polygon(s, asa_cor, [(16, 1), (10, 6), (13, 8)])
+            else:
+                pygame.draw.polygon(s, asa_cor, [(0, 10), (6, 5), (3, 4)])
+                pygame.draw.polygon(s, asa_cor, [(16, 10), (10, 5), (13, 4)])
+            pygame.draw.ellipse(s, corpo_cor, (5, 3, 6, 7))
+            pygame.draw.rect(s, config.BRANCO, (6, 5, 1, 1))
+            pygame.draw.rect(s, config.BRANCO, (9, 5, 1, 1))
             quadros.append(s)
         return quadros
 

@@ -1,74 +1,217 @@
 # -*- coding: utf-8 -*-
 """
-Desenho do cenario: fundo com parallax e chao/plataformas feitos de tiles.
+Cenario do jogo: ceu com gradiente, sol/lua, estrelas, nuvens, montanhas em
+parallax e o chao montado em tiles com decoracao (grama, flores, pedrinhas).
 
-Tudo tem fallback procedural, entao funciona sem nenhuma imagem. Se existir
-'fundo.png' em assets/, ele e usado como camada distante; senao desenhamos
-morros em camadas (com parallax) na mao. O chao/plataformas usam os tiles do
-Recursos (que tambem tem fallback).
+Quase tudo aqui e PRE-RENDERIZADO uma unica vez quando a fase nasce: o ceu vira
+uma imagem, cada camada de montanha vira uma imagem "emendavel" (a borda direita
+casa com a esquerda, entao da pra rolar infinito), e o chao da fase inteira vira
+uma unica superficie. No frame a frame sobra so meia duzia de blits - bem mais
+leve que desenhar tile por tile, elipse por elipse, como era antes.
+
+Temas disponiveis: "dia", "poente" e "noite". Cada fase usa um, entao o jogador
+sente o tempo passando conforme avanca.
 """
+
+import math
+import random
 
 import pygame
 
 import config
 
+TEMAS = {
+    "dia": dict(
+        ceu_topo=(88, 144, 208), ceu_base=(172, 212, 240),
+        astro=(252, 240, 190), astro_pos=(356, 56), lua=False, estrelas=False,
+        camadas=[(60, 108, 80), (78, 138, 94), (94, 164, 106)],
+        nuvens=True, cor_nuvem=(245, 248, 252),
+        tinta=None,
+    ),
+    "poente": dict(
+        ceu_topo=(110, 76, 134), ceu_base=(244, 158, 92),
+        astro=(255, 214, 140), astro_pos=(340, 150), lua=False, estrelas=False,
+        camadas=[(78, 54, 92), (108, 70, 96), (140, 92, 100)],
+        nuvens=True, cor_nuvem=(255, 206, 160),
+        tinta=(255, 214, 178),
+    ),
+    "noite": dict(
+        ceu_topo=(16, 20, 40), ceu_base=(46, 58, 96),
+        astro=(232, 234, 222), astro_pos=(380, 48), lua=True, estrelas=True,
+        camadas=[(28, 34, 58), (36, 44, 72), (46, 56, 88)],
+        nuvens=False, cor_nuvem=(70, 80, 110),
+        tinta=(150, 158, 210),
+    ),
+}
+
+
+def _mistura(a, b, f):
+    return (int(a[0] + (b[0] - a[0]) * f),
+            int(a[1] + (b[1] - a[1]) * f),
+            int(a[2] + (b[2] - a[2]) * f))
+
 
 class Fundo:
-    """Fundo do cenario, com rolagem em parallax (camadas em velocidades diferentes)."""
+    """Ceu + parallax. Criar uma vez por fase e chamar desenhar() por frame."""
 
-    def __init__(self, recursos, tema="dia"):
-        self.tema = tema
-        self.cor_ceu = config.AZUL_NOITE if tema == "noite" else config.AZUL_CEU
-        self.img = recursos.fundo_img()  # Surface ou None
+    def __init__(self, recursos, tema="dia", semente=0):
+        self.tema = TEMAS.get(tema, TEMAS["dia"])
+        self.nome_tema = tema
+        rnd = random.Random(semente * 31 + 7)
+        self.ceu = self._montar_ceu(rnd)
+        self.img_extra = recursos.fundo_img()   # fundo.png do usuario, se houver
+        # camadas de montanha: (surface, fator de parallax)
+        fatores = (0.22, 0.42, 0.65)
+        bases = (148, 172, 198)
+        amps = (24, 18, 12)
+        self.camadas = []
+        for cor, fator, base, amp in zip(self.tema["camadas"], fatores, bases, amps):
+            self.camadas.append((self._montar_morros(cor, base, amp, rnd), fator))
+        self.nuvens = self._montar_nuvens(rnd) if self.tema["nuvens"] else []
 
+    # ------------------------------------------------------------ construcao
+    def _montar_ceu(self, rnd):
+        ceu = pygame.Surface((config.LARGURA, config.ALTURA))
+        topo, base = self.tema["ceu_topo"], self.tema["ceu_base"]
+        for y in range(config.ALTURA):
+            cor = _mistura(topo, base, y / config.ALTURA)
+            pygame.draw.line(ceu, cor, (0, y), (config.LARGURA, y))
+
+        if self.tema["estrelas"]:
+            for _ in range(70):
+                x = rnd.randrange(config.LARGURA)
+                y = rnd.randrange(0, 170)
+                brilho = rnd.randint(120, 240)
+                tam = 2 if rnd.random() < 0.12 else 1
+                pygame.draw.rect(ceu, (brilho, brilho, min(255, brilho + 15)), (x, y, tam, tam))
+
+        # sol (ou lua) com um halo suave
+        ax, ay = self.tema["astro_pos"]
+        cor = self.tema["astro"]
+        raio = 13 if self.tema["lua"] else 16
+        halo = pygame.Surface((raio * 6, raio * 6), pygame.SRCALPHA)
+        for r, alfa in ((raio * 3, 18), (raio * 2, 32), (int(raio * 1.4), 50)):
+            pygame.draw.circle(halo, (cor[0], cor[1], cor[2], alfa), (raio * 3, raio * 3), r)
+        ceu.blit(halo, (ax - raio * 3, ay - raio * 3))
+        pygame.draw.circle(ceu, cor, (ax, ay), raio)
+        if self.tema["lua"]:
+            # "mordida" da lua crescente, na cor do ceu local
+            pygame.draw.circle(ceu, _mistura(self.tema["ceu_topo"], self.tema["ceu_base"], ay / config.ALTURA),
+                               (ax + 5, ay - 3), raio - 3)
+        return ceu
+
+    def _montar_morros(self, cor, base_y, amp, rnd):
+        """Silhueta de morros que emenda nas bordas (senos com ciclos inteiros)."""
+        larg = config.LARGURA
+        s = pygame.Surface((larg, config.ALTURA), pygame.SRCALPHA)
+        k1 = rnd.choice((2, 3))
+        k2 = rnd.choice((5, 7))
+        p1 = rnd.uniform(0, math.tau)
+        p2 = rnd.uniform(0, math.tau)
+        pontos = []
+        for x in range(0, larg + 1, 4):
+            y = (base_y
+                 + amp * math.sin(math.tau * k1 * x / larg + p1)
+                 + amp * 0.45 * math.sin(math.tau * k2 * x / larg + p2))
+            pontos.append((x, y))
+        pygame.draw.polygon(s, cor, [(0, config.ALTURA)] + pontos + [(larg, config.ALTURA)])
+        # pinheirinhos na camada mais proxima dao profundidade
+        if base_y >= 190:
+            escura = _mistura(cor, (0, 0, 0), 0.25)
+            for _ in range(10):
+                px = rnd.randrange(8, larg - 8)
+                py = base_y + amp * math.sin(math.tau * k1 * px / larg + p1) \
+                    + amp * 0.45 * math.sin(math.tau * k2 * px / larg + p2)
+                h = rnd.randint(10, 18)
+                pygame.draw.polygon(s, escura, [(px - 4, py + 2), (px + 4, py + 2), (px, py - h)])
+        return s
+
+    def _montar_nuvens(self, rnd):
+        nuvens = []
+        cor = self.tema["cor_nuvem"]
+        for _ in range(5):
+            larg = rnd.randint(36, 64)
+            alt = rnd.randint(10, 16)
+            s = pygame.Surface((larg, alt), pygame.SRCALPHA)
+            for _ in range(4):
+                rx = rnd.randint(0, larg - 18)
+                ry = rnd.randint(0, alt - 8)
+                pygame.draw.ellipse(s, (cor[0], cor[1], cor[2], 80), (rx, ry, 18, 9))
+            nuvens.append(dict(img=s, x=rnd.uniform(0, config.LARGURA),
+                               y=rnd.randint(18, 90), vel=rnd.uniform(2.0, 5.0)))
+        return nuvens
+
+    # ------------------------------------------------------------ por frame
     def desenhar(self, tela, offset_x):
-        tela.fill(self.cor_ceu)
-        if self.img is not None:
-            self._tile_horizontal(tela, self.img, offset_x * 0.3)
-        else:
-            self._morros(tela, offset_x)
+        tela.blit(self.ceu, (0, 0))
+        agora = pygame.time.get_ticks() * 0.001
 
-    def _tile_horizontal(self, tela, img, deslocamento):
-        w = img.get_width()
-        y = tela.get_height() - img.get_height()
-        x = -(int(deslocamento) % w) - w
-        while x < tela.get_width():
-            tela.blit(img, (x, y))
-            x += w
+        for nuvem in self.nuvens:
+            faixa = config.LARGURA + 90
+            x = (nuvem["x"] + agora * nuvem["vel"] - offset_x * 0.12) % faixa - 80
+            tela.blit(nuvem["img"], (int(x), nuvem["y"]))
 
-    def _morros(self, tela, offset_x):
-        if self.tema == "noite":
-            camadas = [((40, 52, 84), 0.3, 150, 175, 260),
-                       ((30, 40, 66), 0.55, 175, 200, 200)]
-        else:
-            camadas = [((78, 140, 96), 0.3, 150, 175, 260),
-                       (config.VERDE_ESCURO, 0.55, 175, 200, 200)]
-        for cor, fator, raio_y, base_y, passo in camadas:
-            deslocamento = int(offset_x * fator) % passo
-            x = -passo - deslocamento
-            while x < config.LARGURA + passo:
-                pygame.draw.ellipse(tela, cor, (x, base_y, passo + 60, raio_y))
-                x += passo
+        if self.img_extra is not None:
+            larg = self.img_extra.get_width()
+            dx = -int(offset_x * 0.3) % larg
+            y = config.ALTURA - self.img_extra.get_height()
+            tela.blit(self.img_extra, (dx - larg, y))
+            tela.blit(self.img_extra, (dx, y))
+
+        for img, fator in self.camadas:
+            larg = img.get_width()
+            dx = -int(offset_x * fator) % larg
+            tela.blit(img, (dx - larg, 0))
+            if dx < config.LARGURA:
+                tela.blit(img, (dx, 0))
 
 
-def desenhar_solido(tela, rect_tela, tile_topo, tile_miolo):
-    """Preenche um retangulo solido com tiles: grama no topo, terra no resto."""
-    tw, th = tile_miolo.get_size()
-    clip_antigo = tela.get_clip()
-    tela.set_clip(rect_tela)
-    for tx in range(rect_tela.left, rect_tela.right, tw):
-        tela.blit(tile_topo, (tx, rect_tela.top))
-        ty = rect_tela.top + th
-        while ty < rect_tela.bottom:
-            tela.blit(tile_miolo, (tx, ty))
-            ty += th
-    tela.set_clip(clip_antigo)
+# ---------------------------------------------------------------------------
+# Terreno: a fase inteira (chao + plataformas + decoracao) numa superficie so.
+# ---------------------------------------------------------------------------
+def montar_terreno(largura_mundo, solidos, plataformas, recursos, semente=1, tema="dia"):
+    sup = pygame.Surface((largura_mundo, config.ALTURA), pygame.SRCALPHA)
+    grama = recursos.tile_grama()
+    terra = recursos.tile_terra()
+    tabua = recursos.tile_plataforma()
+    rnd = random.Random(semente)
 
+    clip_antigo = sup.get_clip()
+    for s in solidos:
+        sup.set_clip(s)
+        for tx in range(s.left - s.left % 16, s.right, 16):
+            sup.blit(grama, (tx, s.top))
+            ty = s.top + 16
+            while ty < s.bottom:
+                sup.blit(terra, (tx, ty))
+                ty += 16
+    for p in plataformas:
+        sup.set_clip(p)
+        for tx in range(p.left - p.left % 16, p.right, 16):
+            sup.blit(tabua, (tx, p.top))
+    sup.set_clip(clip_antigo)
 
-def desenhar_plataforma(tela, rect_tela, tile):
-    tw = tile.get_width()
-    clip_antigo = tela.get_clip()
-    tela.set_clip(rect_tela)
-    for tx in range(rect_tela.left, rect_tela.right, tw):
-        tela.blit(tile, (tx, rect_tela.top))
-    tela.set_clip(clip_antigo)
+    # decoracao em cima do chao: tufos de grama, florzinhas e pedrinhas
+    for s in solidos:
+        if s.width < 40:
+            continue  # pilares e paredes ficam sem enfeite
+        x = s.left + 6
+        while x < s.right - 6:
+            sorte = rnd.random()
+            topo = s.top
+            if sorte < 0.30:
+                pygame.draw.line(sup, config.VERDE, (x, topo - 3), (x, topo), 1)
+                pygame.draw.line(sup, config.VERDE, (x + 2, topo - 2), (x + 2, topo), 1)
+            elif sorte < 0.42:
+                cor_flor = rnd.choice(((232, 120, 140), (240, 220, 120), (170, 150, 230)))
+                pygame.draw.line(sup, config.VERDE_ESCURO, (x, topo - 3), (x, topo), 1)
+                pygame.draw.rect(sup, cor_flor, (x - 1, topo - 5, 3, 3))
+            elif sorte < 0.50:
+                pygame.draw.rect(sup, config.CINZA, (x, topo + 2, 2, 2))
+            x += rnd.randint(10, 26)
+
+    # tinta da hora do dia (deixa o chao combinar com o ceu)
+    tinta = TEMAS.get(tema, TEMAS["dia"])["tinta"]
+    if tinta:
+        sup.fill(tinta, special_flags=pygame.BLEND_RGB_MULT)
+    return sup

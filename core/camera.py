@@ -44,6 +44,10 @@ class Camera:
             self._tremor = 0.0
             self._sx = self._sy = 0
 
+    def origem(self):
+        """Onde fica o (0,0) do mundo na tela (util pra blitar o terreno inteiro)."""
+        return (-self.offset_x + self._sx, self._sy)
+
     def aplicar(self, rect):
         """Rect do mundo -> Rect na tela."""
         return rect.move(-self.offset_x + self._sx, self._sy)
