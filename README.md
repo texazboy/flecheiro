@@ -44,16 +44,24 @@ No Linux/Mac é igual, trocando a ativação do venv por `source .venv/bin/activ
 |------|-------|
 | Andar | `A` / `D` ou setas |
 | Pular | `Espaço` (ou `W` / seta para cima) |
-| Atirar flecha | clique esquerdo do mouse (mira no cursor) |
+| Atirar | **segurar** o botão esquerdo tensiona o arco; **soltar** dispara |
 | Coletar itens próximos | `E` |
 | Mostrar rota ótima de coleta (TSP) | `T` |
 | Abrir/fechar inventário | `I` (ou `Tab`) |
 | Conversar com NPC / seguir viagem (na vila) | `E` |
-| Voltar ao menu | `Esc` |
+| Pausar | `Esc` |
+| Som liga/desliga | `M` |
 
-A flecha voa em arco e, ao bater numa estrutura, **finca e vira uma pequena
-plataforma**. Atirando flechas numa parede dá pra escalar até onde o pulo não
-alcança — é assim que se passa o obstáculo da fase 2.
+Quanto mais tempo o arco fica tensionado, mais longe (e mais forte) a flecha
+vai — a trajetória pontilhada mostra exatamente onde ela cai. Ao bater numa
+estrutura, a flecha **finca e vira uma pequena plataforma**: é assim que se
+escala a parede da fase 2 e se atravessam os vãos da fase 3 (a flecha fincada
+na beirada funciona de ponte).
+
+São **três fases** (dia, poente e noite), com a vila entre elas. Inimigos
+terrestres patrulham o chão e morcegos rondam os pontos altos. Os efeitos
+sonoros e a música de fundo são gerados pelo próprio código (sem arquivos de
+áudio).
 
 ## Algoritmos implementados (e onde aparecem)
 
@@ -84,7 +92,8 @@ Os detalhes e a justificativa de cada escolha estão em
 │   ├── camera.py           #   câmera do side-scroller (conversão de coordenadas)
 │   ├── recursos.py         #   carrega sprites/animações/tiles (com fallback)
 │   ├── animacao.py         #   sistema de animação por spritesheet
-│   ├── cenario.py          #   fundo com parallax e chão/plataformas de tiles
+│   ├── cenario.py          #   céu com gradiente, parallax e terreno pré-renderizado
+│   ├── som.py              #   efeitos sonoros e música gerados em código (chiptune)
 │   ├── inventario.py       #   estrutura de dados do inventário
 │   └── mundo.py            #   estado que persiste entre as fases
 ├── entidades/              # jogador, flecha, inimigo, item

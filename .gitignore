@@ -19,3 +19,7 @@ Thumbs.db
 docs/GUIA_ENTREGA.md
 refazer_git.ps1
 limpar_git.ps1
+
+# Artigo academico (entrega separada, nao faz parte do repo do jogo)
+artigo/
+

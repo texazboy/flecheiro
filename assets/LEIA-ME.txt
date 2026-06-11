@@ -47,7 +47,8 @@ Estados usados pelo jogo:
   jogador_andar(_N).png     andando
   jogador_atirar(_N).png    atirando (toca uma vez)
   jogador_pulo(_N).png      no ar
-  inimigo_andar(_N).png     inimigo andando
+  inimigo_andar(_N).png     inimigo terrestre andando
+  voador_voar(_N).png       inimigo voador (morcego) batendo asas
 
 (Se faltar algum estado, o jogo usa o placeholder so daquele estado.)
 
