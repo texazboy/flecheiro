@@ -10,6 +10,7 @@ Tem duas coisas aqui:
                posicao, fica "flutuando" de leve e some quando o jogador coleta.
 """
 
+import math
 from dataclasses import dataclass
 
 import pygame
@@ -59,7 +60,6 @@ class ItemNoChao:
     def atualizar(self, dt):
         # leve flutuacao pra chamar atencao do jogador
         self.tempo += dt
-        import math
         desloc = math.sin(self.tempo * 4.0) * 2.0
         self.rect.centery = int(self.base_y + desloc)
 

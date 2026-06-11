@@ -4,10 +4,15 @@ A flecha do arqueiro.
 
 E a mecanica central do jogo: a flecha voa em arco (tem gravidade propria) e,
 quando bate numa estrutura solida, ela se FINCA e vira uma pequena plataforma em
-que o jogador pode subir. Atirando flechas numa parede da pra escalar.
+que o jogador pode subir. Atirando flechas numa parede da pra escalar - e nos
+vaos da fase 3 elas tambem servem de ponte.
 
 Quem trata a colisao flecha-inimigo e a Fase (pra ja cuidar do drop de item);
 aqui a flecha cuida do voo, de fincar na parede e de sumir quando sai do mundo.
+
+Detalhe de desempenho: rotacionar a imagem todo frame e caro, entao guardamos
+as rotacoes ja calculadas num cache de 10 em 10 graus (a olho nao da pra notar
+a diferenca, e economiza milhares de rotates por segundo).
 """
 
 import math
@@ -15,16 +20,18 @@ import math
 import pygame
 
 import config
+from core import som
 
 
 class Flecha:
-    def __init__(self, x, y, dir_x, dir_y, dano, vel_mult, recursos):
+    _cache_rotacao = {}
+
+    def __init__(self, x, y, dir_x, dir_y, dano, velocidade, recursos):
         self.sprite = recursos.sprite_flecha()
-        vel = config.FORCA_FLECHA * vel_mult
         self.x = float(x)
         self.y = float(y)
-        self.vx = dir_x * vel
-        self.vy = dir_y * vel
+        self.vx = dir_x * velocidade
+        self.vy = dir_y * velocidade
         self.dano = dano
         self.angulo = math.atan2(self.vy, self.vx)
         self.fincada = False
@@ -61,14 +68,23 @@ class Flecha:
         self.x = max(solido.left, min(self.x, solido.right))
         self.y = max(solido.top, min(self.y, solido.bottom))
         self.rect.center = (int(self.x), int(self.y))
+        som.tocar("fincar")
 
     def plataforma_rect(self):
         """A barrinha em que o jogador consegue pisar (so quando fincada)."""
         return pygame.Rect(int(self.x) - 8, int(self.y) - 2, 16, 5)
 
+    def _quadro_rotacionado(self):
+        graus = int(round(-math.degrees(self.angulo) / 10.0)) * 10 % 360
+        chave = (id(self.sprite), graus)
+        img = Flecha._cache_rotacao.get(chave)
+        if img is None:
+            img = pygame.transform.rotate(self.sprite, graus)
+            Flecha._cache_rotacao[chave] = img
+        return img
+
     def desenhar(self, tela, camera):
-        graus = -math.degrees(self.angulo)
-        img = pygame.transform.rotate(self.sprite, graus)
+        img = self._quadro_rotacionado()
         destino = img.get_rect(center=camera.aplicar_ponto((self.x, self.y)))
         tela.blit(img, destino)
         if self.fincada:

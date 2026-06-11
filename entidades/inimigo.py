@@ -1,8 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Inimigo basico: anda de um lado pro outro (patrulha) sobre uma plataforma,
-toma dano das flechas e, quando morre, larga um item no chao pra ser coletado.
+Inimigos do jogo.
+
+  - Inimigo        : o terrestre classico, patrulha de um lado pro outro.
+  - InimigoVoador  : morcego que voa em "oito" no ar; gosta de ficar pairando
+                     sobre os vaos da fase 3, bem onde o jogador quer pular.
+
+Os dois falam a mesma "lingua" (atualizar / levar_dano / desenhar / rect /
+morto / dropa), entao a Fase trata todo mundo igual.
 """
+
+import math
 
 import pygame
 
@@ -76,3 +84,48 @@ class Inimigo:
             largura = int(self.rect.width * (self.vida / self.vida_max))
             pygame.draw.rect(tela, config.PRETO, (r.left, r.top - 4, self.rect.width, 2))
             pygame.draw.rect(tela, config.VERMELHO, (r.left, r.top - 4, max(0, largura), 2))
+
+
+class InimigoVoador:
+    """Morcego: paira fazendo um 'oito' em volta do ponto de origem."""
+
+    def __init__(self, x, y, recursos, dropa="pena", raio=28, vida=1, velocidade=1.4):
+        self.rect = pygame.Rect(0, 0, 14, 12)
+        self.rect.center = (x, y)
+        self.origem = (float(x), float(y))
+        self.raio = raio
+        self.velocidade = velocidade
+        self.tempo = (x * 0.013) % math.tau   # defasagem pra nao voarem em sincronia
+        self.vida = vida
+        self.vida_max = vida
+        self.morto = False
+        self.dropa = dropa
+        self.flash = 0.0
+        self._x_anterior = float(x)
+        self.anim = recursos.animacao("voador", "voar", 12, fps=9)
+
+    def atualizar(self, dt, fase):
+        self.tempo += dt * self.velocidade
+        cx = self.origem[0] + math.cos(self.tempo) * self.raio * 2
+        cy = self.origem[1] + math.sin(self.tempo * 2.0) * self.raio * 0.6
+        self._x_anterior = self.rect.centerx
+        self.rect.center = (int(cx), int(cy))
+        self.anim.atualizar(dt)
+        if self.flash > 0:
+            self.flash = max(0.0, self.flash - dt)
+
+    def levar_dano(self, dano):
+        self.vida -= dano
+        self.flash = 0.12
+        if self.vida <= 0:
+            self.morto = True
+
+    def desenhar(self, tela, camera):
+        quadro = self.anim.quadro()
+        if self.rect.centerx < self._x_anterior:
+            quadro = pygame.transform.flip(quadro, True, False)
+        if self.flash > 0:
+            quadro = quadro.copy()
+            quadro.fill((255, 255, 255), special_flags=pygame.BLEND_RGB_ADD)
+        destino = quadro.get_rect(center=camera.aplicar(self.rect).center)
+        tela.blit(quadro, destino)

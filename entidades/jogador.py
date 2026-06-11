@@ -14,6 +14,7 @@ import math
 import pygame
 
 import config
+from core import som
 from entidades.flecha import Flecha
 
 
@@ -30,6 +31,7 @@ class Jogador:
         self.virado_dir = True
         self.invul = 0.0          # invencibilidade temporaria apos tomar dano
         self.cooldown_tiro = 0.0
+        self.mirando = False      # segurando o mouse (tensiona o arco e anda devagar)
         # "coyote time" e "jump buffer": deixam o pulo mais gostoso de usar
         self.coyote = 0.0
         self.buffer_pulo = 0.0
@@ -50,8 +52,12 @@ class Jogador:
         # tiquinho antes de encostar no chao.
         self.buffer_pulo = 0.12
 
-    def criar_flecha(self, alvo_mundo, arco):
-        """Cria uma flecha mirando em 'alvo_mundo' (coordenadas de mundo)."""
+    def criar_flecha(self, alvo_mundo, arco, carga=1.0):
+        """
+        Cria uma flecha mirando em 'alvo_mundo' (coordenadas de mundo).
+        'carga' vai de 0 a 1 (tempo segurando o mouse): muda velocidade e,
+        com o arco bem tensionado, da um ponto extra de dano.
+        """
         if self.cooldown_tiro > 0:
             return None
         origem = (self.rect.centerx, self.rect.centery - 2)
@@ -59,9 +65,12 @@ class Jogador:
         dy = alvo_mundo[1] - origem[1]
         dist = math.hypot(dx, dy) or 1.0
         self.virado_dir = dx >= 0
-        self.cooldown_tiro = 0.25
+        self.cooldown_tiro = 0.18
+        vel = config.FORCA_FLECHA * (0.55 + 0.45 * carga) * arco.velocidade
+        dano = arco.dano + (1 if carga >= 0.9 else 0)
+        som.tocar("tiro")
         return Flecha(origem[0], origem[1], dx / dist, dy / dist,
-                      arco.dano, arco.velocidade, self.recursos)
+                      dano, vel, self.recursos)
 
     # ------------------------------------------------------------- update
     def atualizar(self, dt, fase):
@@ -92,6 +101,7 @@ class Jogador:
             self.no_chao = False
             self.coyote = 0.0
             self.buffer_pulo = 0.0
+            som.tocar("pulo")
 
         if self.invul > 0:
             self.invul = max(0.0, self.invul - dt)
@@ -101,7 +111,7 @@ class Jogador:
         self._atualizar_animacao(dt)
 
     def _atualizar_animacao(self, dt):
-        if self.cooldown_tiro > 0 and self.no_chao:
+        if (self.mirando or self.cooldown_tiro > 0) and self.no_chao:
             novo = "atirar"
         elif not self.no_chao:
             novo = "pulo"
@@ -116,12 +126,14 @@ class Jogador:
 
     def _ler_teclado(self):
         teclas = pygame.key.get_pressed()
+        # com o arco tensionado o arqueiro anda mais devagar (peso da mira)
+        vel = config.VEL_ANDAR * (0.55 if self.mirando else 1.0)
         self.vx = 0.0
         if teclas[pygame.K_a] or teclas[pygame.K_LEFT]:
-            self.vx = -config.VEL_ANDAR
+            self.vx = -vel
             self.virado_dir = False
         if teclas[pygame.K_d] or teclas[pygame.K_RIGHT]:
-            self.vx = config.VEL_ANDAR
+            self.vx = vel
             self.virado_dir = True
 
     # ------------------------------------------------------------- colisao
@@ -162,6 +174,7 @@ class Jogador:
             self.vx = 0
             self.rect.x += -6 if origem_x > self.rect.centerx else 6
         self.vy = -3.0
+        som.tocar("dano")
         return True
 
     # ------------------------------------------------------------- desenho
