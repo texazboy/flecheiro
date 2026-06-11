@@ -1,29 +1,74 @@
 # -*- coding: utf-8 -*-
-"""HUD: vida (coracoes), ouro, arco equipado e a linha de dicas de teclas."""
+"""
+HUD: coracoes de vida, ouro com moedinha, arco equipado, nome do lugar e a
+linha de dicas de teclas. Os icones sao desenhados pixel a pixel uma vez so
+na criacao e reaproveitados.
+"""
 
 import pygame
 
 import config
+from core import som
 from telas import comum
+
+# 7x6, X = pixel aceso
+_MAPA_CORACAO = [
+    "0110110",
+    "1111111",
+    "1111111",
+    "0111110",
+    "0011100",
+    "0001000",
+]
+
+
+def _desenhar_mapa(mapa, cor):
+    s = pygame.Surface((len(mapa[0]), len(mapa)), pygame.SRCALPHA)
+    for y, linha in enumerate(mapa):
+        for x, c in enumerate(linha):
+            if c == "1":
+                s.set_at((x, y), cor)
+    return s
 
 
 class HUD:
     def __init__(self, mundo, recursos):
         self.mundo = mundo
         self.fonte = recursos.fonte(16)
+        self.coracao_cheio = _desenhar_mapa(_MAPA_CORACAO, config.VERMELHO)
+        self.coracao_vazio = _desenhar_mapa(_MAPA_CORACAO, config.CINZA_ESCURO)
+        self.moeda = self._fazer_moeda()
 
-    def desenhar(self, tela, dica=""):
-        # coracoes de vida
+    @staticmethod
+    def _fazer_moeda():
+        s = pygame.Surface((8, 8), pygame.SRCALPHA)
+        pygame.draw.circle(s, config.AMARELO, (4, 4), 3)
+        pygame.draw.circle(s, (160, 130, 40), (4, 4), 3, 1)
+        s.set_at((3, 3), config.BRANCO)
+        return s
+
+    def desenhar(self, tela, dica="", local=""):
+        # coracoes
         for i in range(self.mundo.vida_max):
-            x = 6 + i * 12
-            cheio = i < self.mundo.vida
-            cor = config.VERMELHO if cheio else config.CINZA_ESCURO
-            pygame.draw.rect(tela, cor, (x, 6, 9, 8))
-            pygame.draw.rect(tela, config.PRETO, (x, 6, 9, 8), 1)
+            img = self.coracao_cheio if i < self.mundo.vida else self.coracao_vazio
+            tela.blit(img, (6 + i * 10, 6))
 
-        # ouro e arco
-        comum.texto(tela, self.fonte, f"Ouro: {self.mundo.ouro}", 6, 18, config.AMARELO)
-        comum.texto(tela, self.fonte, self.mundo.arco.nome, 6, 30, config.VERDE)
+        # ouro
+        tela.blit(self.moeda, (6, 17))
+        comum.texto(tela, self.fonte, str(self.mundo.ouro), 17, 16, config.AMARELO)
+
+        # arco equipado (chip colorido + nome)
+        pygame.draw.rect(tela, self.mundo.arco.cor, (6, 30, 6, 6))
+        pygame.draw.rect(tela, config.PRETO, (6, 30, 6, 6), 1)
+        comum.texto(tela, self.fonte, self.mundo.arco.nome, 16, 29, config.VERDE)
+
+        # canto direito: onde estamos + estado do som
+        if local:
+            comum.texto(tela, self.fonte, local, config.LARGURA - 6 -
+                        self.fonte.size(local)[0], 6, config.BRANCO)
+        if som.esta_mudo():
+            comum.texto(tela, self.fonte, "som off [M]", config.LARGURA - 6 -
+                        self.fonte.size("som off [M]")[0], 18, config.CINZA)
 
         if dica:
             comum.texto(tela, self.fonte, dica, config.LARGURA // 2,
