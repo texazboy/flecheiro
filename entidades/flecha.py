@@ -36,11 +36,14 @@ class Flecha:
         self.angulo = math.atan2(self.vy, self.vx)
         self.fincada = False
         self.morta = False        # marcada para remocao
+        self.balanco = 0.0        # vibracao logo depois de fincar
         self.rect = pygame.Rect(0, 0, 6, 6)
         self.rect.center = (int(self.x), int(self.y))
 
     def atualizar(self, dt, fase):
         if self.fincada:
+            if self.balanco > 0:
+                self.balanco = max(0.0, self.balanco - dt)
             return
 
         self.vy = min(self.vy + config.GRAVIDADE_FLECHA, config.VEL_MAX_QUEDA)
@@ -68,6 +71,7 @@ class Flecha:
         self.x = max(solido.left, min(self.x, solido.right))
         self.y = max(solido.top, min(self.y, solido.bottom))
         self.rect.center = (int(self.x), int(self.y))
+        self.balanco = 0.35       # treme um pouquinho com o impacto
         som.tocar("fincar")
 
     def plataforma_rect(self):
@@ -75,7 +79,11 @@ class Flecha:
         return pygame.Rect(int(self.x) - 8, int(self.y) - 2, 16, 5)
 
     def _quadro_rotacionado(self):
-        graus = int(round(-math.degrees(self.angulo) / 10.0)) * 10 % 360
+        graus_base = -math.degrees(self.angulo)
+        if self.balanco > 0:
+            forca = self.balanco / 0.35
+            graus_base += math.sin(self.balanco * 45.0) * 10.0 * forca
+        graus = int(round(graus_base / 10.0)) * 10 % 360
         chave = (id(self.sprite), graus)
         img = Flecha._cache_rotacao.get(chave)
         if img is None:

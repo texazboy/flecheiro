@@ -69,6 +69,35 @@ class TextoFlutuante:
         comum.texto(tela, self.fonte, self.texto, int(px), int(py), self.cor, centro=True)
 
 
+class Onda:
+    """Anel que se expande e some: o 'tum' visual de um impacto forte."""
+
+    def __init__(self, x, y, raio_max=18, cor=(240, 240, 245), dur=0.28):
+        self.x = float(x)
+        self.y = float(y)
+        self.raio_max = raio_max
+        self.cor = cor
+        self.dur = dur
+        self.tempo = 0.0
+
+    @property
+    def morta(self):
+        return self.tempo >= self.dur
+
+    def atualizar(self, dt):
+        self.tempo += dt
+
+    def desenhar(self, tela, camera):
+        frac = min(1.0, self.tempo / self.dur)
+        raio = max(2, int(self.raio_max * frac))
+        alfa = int(200 * (1.0 - frac))
+        s = pygame.Surface((raio * 2 + 2, raio * 2 + 2), pygame.SRCALPHA)
+        pygame.draw.circle(s, (self.cor[0], self.cor[1], self.cor[2], alfa),
+                           (raio + 1, raio + 1), raio, 2)
+        px, py = camera.aplicar_ponto((self.x, self.y))
+        tela.blit(s, (int(px) - raio - 1, int(py) - raio - 1))
+
+
 # ------------------------------------------------------------- receitas
 def explosao(x, y, cor, quantidade=10):
     """Estouro de poeira: usado em morte de inimigo e coleta de item."""
@@ -85,3 +114,10 @@ def fumaca(x, y):
     """Fumacinha que sobe devagar (chamine da vila)."""
     return Particula(x, y, (152, 152, 162), espalhar=0.25, sobe=0.35,
                      gravidade=-0.01, vida=(1.2, 2.0), tam=(2, 3))
+
+
+def poeira(x, y, quantidade=5):
+    """Nuvenzinha nos pes: levantada ao correr e ao aterrissar."""
+    return [Particula(x, y, (188, 168, 138), espalhar=1.0, sobe=0.35,
+                      gravidade=0.02, vida=(0.2, 0.45), tam=(1, 2))
+            for _ in range(quantidade)]

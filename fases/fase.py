@@ -23,10 +23,11 @@ from core.estados import Estado
 from core.camera import Camera
 from core import som
 from core.cenario import Fundo, montar_terreno
+from core.luz import Luzes, AMBIENTE
 from entidades.jogador import Jogador
 from entidades.inimigo import Inimigo, InimigoVoador
 from entidades.item import ItemNoChao, MATERIAIS
-from entidades.efeitos import explosao, faisca, TextoFlutuante
+from entidades.efeitos import explosao, faisca, poeira, Onda, TextoFlutuante
 from telas.hud import HUD
 from telas.tela_inventario import TelaInventario
 from telas.pausa import Pausa
@@ -131,12 +132,23 @@ class Fase(Estado):
 
         self.camera = Camera(config.LARGURA, config.ALTURA, self.largura_mundo)
         self.hud = HUD(self.mundo, self.recursos)
-        tema = TEMA_POR_FASE.get(numero, "noite")
-        self.fundo = Fundo(self.recursos, tema, semente=numero)
-        self.terreno = montar_terreno(self.largura_mundo, self.solidos,
-                                      self.plataformas, self.recursos,
-                                      semente=numero * 7, tema=tema)
+        self.tema = TEMA_POR_FASE.get(numero, "noite")
+        self.fundo = Fundo(self.recursos, self.tema, semente=numero)
+        self.terreno, self.luzes_fixas = montar_terreno(
+            self.largura_mundo, self.solidos, self.plataformas, self.recursos,
+            semente=numero * 7, tema=self.tema)
+        self.luzes = Luzes(AMBIENTE.get(self.tema))
         self.brilho_porta = self._fazer_brilho_porta()
+
+        # tochas fincadas nas beiradas dos vaos da fase noturna: a luz
+        # tremulante marca o perigo de longe
+        self.tochas = []
+        if numero == 3:
+            self.tochas = [(508, 239), (588, 239), (1052, 239), (1152, 239)]
+            for tx, ty in self.tochas:
+                pygame.draw.rect(self.terreno, (70, 54, 40), (tx - 1, ty - 12, 2, 13))
+                pygame.draw.rect(self.terreno, (255, 180, 80), (tx - 2, ty - 16, 4, 5))
+                pygame.draw.rect(self.terreno, (255, 230, 150), (tx - 1, ty - 15, 2, 2))
 
         self.overlay = None
         self.mostrar_rota = False
@@ -148,6 +160,25 @@ class Fase(Estado):
         self.carga = 0.0
         self.hitstop = 0.0
         self._timer_porta = 0.0
+        self._aviso_carga = False
+
+        # vida ambiente: folhas de dia, brasas no poente, vagalumes de noite
+        self.ondas = []
+        self.folhas = []
+        self._timer_folha = 0.0
+        self.passaros = []
+        self._timer_passaro = random.uniform(2.0, 5.0)
+        self.vagalumes = []
+        if self.tema == "noite":
+            self.vagalumes = [dict(x=random.uniform(0, self.largura_mundo),
+                                   y=random.uniform(120, 225),
+                                   defasagem=random.uniform(0, math.tau))
+                              for _ in range(12)]
+
+        # rastreio do pouso/corrida pra soltar poeirinha nos pes
+        self._no_chao_antes = True
+        self._vy_queda = 0.0
+        self._timer_passo = 0.0
 
     def entrar(self):
         som.musica("fase")
@@ -230,9 +261,20 @@ class Fase(Estado):
 
         if self.carregando:
             self.carga = min(1.0, self.carga + dt / config.TEMPO_CARGA)
+            if self.carga >= 1.0 and not self._aviso_carga:
+                # arco totalmente tensionado: clique + anelzinho de aviso
+                self._aviso_carga = True
+                som.tocar("pronto", 0.7)
+                self.ondas.append(Onda(self.jogador.rect.centerx,
+                                       self.jogador.rect.centery, 12, config.AMARELO, 0.2))
+        else:
+            self._aviso_carga = False
         self.jogador.mirando = self.carregando
 
+        if not self.jogador.no_chao:
+            self._vy_queda = max(self._vy_queda, self.jogador.vy)
         self.jogador.atualizar(dt, self)
+        self._efeitos_de_movimento(dt)
 
         for f in self.flechas:
             f.atualizar(dt, self)
@@ -247,6 +289,7 @@ class Fase(Estado):
                 self._dropar(inim)
                 self.particulas += explosao(inim.rect.centerx, inim.rect.centery,
                                             config.VERMELHO, 12)
+                self.ondas.append(Onda(inim.rect.centerx, inim.rect.centery, 20))
                 self.camera.sacudir(3)
                 self.hitstop = 0.05
                 self.mundo.abatidos += 1
@@ -272,9 +315,14 @@ class Fase(Estado):
         self.particulas = [p for p in self.particulas if not p.morta]
         if len(self.particulas) > config.PARTICULAS_MAX:
             del self.particulas[:len(self.particulas) - config.PARTICULAS_MAX]
+        for o in self.ondas:
+            o.atualizar(dt)
+        self.ondas = [o for o in self.ondas if not o.morta]
         for t in self.textos:
             t.atualizar(dt)
         self.textos = [t for t in self.textos if not t.morto]
+
+        self._atualizar_ambiente(dt)
 
         # rota do TSP fica desatualizada quando um item some -> recalcula
         if self.mostrar_rota and len(self.itens) != len(self._itens_rota):
@@ -339,6 +387,58 @@ class Fase(Estado):
         if pegou:
             som.tocar("coleta")
 
+    def _efeitos_de_movimento(self, dt):
+        """Poeira nos pes ao correr e ao aterrissar (com 'tum' em queda alta)."""
+        jog = self.jogador
+        pe_x, pe_y = jog.rect.centerx, jog.rect.bottom
+        if jog.no_chao and not self._no_chao_antes:
+            forte = self._vy_queda > 6.5
+            self.particulas += poeira(pe_x, pe_y, 8 if forte else 4)
+            if forte:
+                self.ondas.append(Onda(pe_x, pe_y - 2, 14, (220, 210, 190), 0.22))
+                self.camera.sacudir(2)
+                som.tocar("fincar", 0.35)
+            self._vy_queda = 0.0
+        elif jog.no_chao and abs(jog.vx) > 0.1:
+            self._timer_passo += dt
+            if self._timer_passo > 0.22:
+                self._timer_passo = 0.0
+                self.particulas += poeira(pe_x - jog.vx * 3, pe_y, 2)
+        self._no_chao_antes = jog.no_chao
+
+    def _atualizar_ambiente(self, dt):
+        """Vida de fundo: folhas (dia), brasas (poente), passaros e vagalumes."""
+        if self.tema in ("dia", "poente"):
+            self._timer_folha += dt
+            if self._timer_folha > 0.5 and len(self.folhas) < 18:
+                self._timer_folha = 0.0
+                ox = self.camera.offset_x
+                if self.tema == "dia":
+                    cor = random.choice(((120, 190, 110), (180, 200, 90), (150, 180, 80)))
+                    self.folhas.append(dict(x=ox + random.uniform(0, config.LARGURA),
+                                            y=-4.0, vy=random.uniform(14, 24),
+                                            fase=random.uniform(0, math.tau), cor=cor))
+                else:
+                    cor = random.choice(((255, 170, 90), (255, 210, 120), (230, 130, 80)))
+                    self.folhas.append(dict(x=ox + random.uniform(0, config.LARGURA),
+                                            y=random.uniform(180, 250), vy=-random.uniform(8, 16),
+                                            fase=random.uniform(0, math.tau), cor=cor))
+            agora = pygame.time.get_ticks() * 0.001
+            for f in self.folhas:
+                f["y"] += f["vy"] * dt
+                f["x"] += math.sin(agora * 2.0 + f["fase"]) * 18 * dt
+            self.folhas = [f for f in self.folhas if -10 < f["y"] < config.ALTURA + 10]
+
+        if self.tema == "dia":
+            self._timer_passaro -= dt
+            if self._timer_passaro <= 0:
+                self._timer_passaro = random.uniform(5.0, 11.0)
+                self.passaros.append(dict(x=-12.0, y=random.uniform(28, 105),
+                                          vel=random.uniform(22, 34)))
+            for p in self.passaros:
+                p["x"] += p["vel"] * dt
+            self.passaros = [p for p in self.passaros if p["x"] < config.LARGURA + 16]
+
     def _checar_queda(self):
         if self.jogador.rect.top > self.altura_mundo + 40:
             self.jogador.levar_dano(self.mundo, 1)
@@ -362,18 +462,24 @@ class Fase(Estado):
 
     # ----------------------------------------------------------- desenho
     def desenhar(self, tela):
+        agora = pygame.time.get_ticks() * 0.001
         self.fundo.desenhar(tela, self.camera.offset_x)
+        for p in self.passaros:
+            self._desenhar_passaro(tela, p, agora)
         tela.blit(self.terreno, self.camera.origem())
 
         # porta de saida com brilho pulsante
         porta = self.camera.aplicar(self.porta)
-        pulso = 120 + int(60 * math.sin(pygame.time.get_ticks() * 0.004))
+        pulso = 120 + int(60 * math.sin(agora * 4.0))
         self.brilho_porta.set_alpha(pulso)
         tela.blit(self.brilho_porta, (porta.centerx - 36, porta.centery - 44))
         pygame.draw.rect(tela, config.ROXO, porta)
         pygame.draw.rect(tela, config.AMARELO, porta, 1)
         pygame.draw.circle(tela, (210, 170, 240), porta.center, 5, 1)
 
+        for f in self.folhas:
+            px, py = self.camera.aplicar_ponto((f["x"], f["y"]))
+            pygame.draw.rect(tela, f["cor"], (int(px), int(py), 2, 2))
         for it in self.itens:
             it.desenhar(tela, self.camera)
         for inim in self.inimigos:
@@ -384,6 +490,16 @@ class Fase(Estado):
             p.desenhar(tela, self.camera)
 
         self.jogador.desenhar(tela, self.camera)
+
+        # ----- iluminacao: escurece a noite e abre as pocas de luz -----
+        if self.luzes.ativa:
+            self._pedir_luzes(agora)
+            self.luzes.aplicar(tela, self.camera)
+
+        # o que brilha por conta propria vem DEPOIS da luz
+        self._desenhar_vagalumes(tela, agora)
+        for o in self.ondas:
+            o.desenhar(tela, self.camera)
         self._desenhar_arco_e_mira(tela)
 
         for t in self.textos:
@@ -396,6 +512,42 @@ class Fase(Estado):
 
         if self.overlay is not None:
             self.overlay.desenhar(tela)
+
+    def _pedir_luzes(self, agora):
+        luz = self.luzes
+        luz.adicionar(self.jogador.rect.centerx, self.jogador.rect.centery,
+                      72, (255, 226, 185))
+        luz.adicionar(self.porta.centerx, self.porta.centery, 56, (215, 160, 255))
+        for x, y, raio, cor in self.luzes_fixas:
+            luz.adicionar(x, y, raio, cor)
+        for tx, ty in self.tochas:
+            tremor = 44 + math.sin(agora * 13.0 + tx) * 5
+            luz.adicionar(tx, ty - 14, tremor, (255, 188, 110))
+        for it in self.itens:
+            if it.material.chave == "cristal":
+                pulso = 24 + math.sin(agora * 3.0 + it.rect.x) * 5
+                luz.adicionar(it.rect.centerx, it.rect.centery, pulso, (185, 130, 235))
+
+    def _desenhar_vagalumes(self, tela, agora):
+        for v in self.vagalumes:
+            x = v["x"] + math.sin(agora * 0.7 + v["defasagem"]) * 14
+            y = v["y"] + math.sin(agora * 1.3 + v["defasagem"] * 2) * 6
+            brilho = (math.sin(agora * 3 + v["defasagem"]) + 1) / 2
+            if brilho < 0.3:
+                continue
+            px, py = self.camera.aplicar_ponto((x, y))
+            if px < -4 or px > config.LARGURA + 4:
+                continue
+            tam = 2 if brilho > 0.75 else 1
+            pygame.draw.rect(tela, (235, 235, 130), (int(px), int(py), tam, tam))
+
+    @staticmethod
+    def _desenhar_passaro(tela, passaro, agora):
+        x, y = int(passaro["x"]), int(passaro["y"])
+        bater = math.sin(agora * 9.0 + passaro["x"] * 0.1) * 2
+        cor = (52, 62, 76)
+        pygame.draw.line(tela, cor, (x - 3, y - int(bater)), (x, y), 1)
+        pygame.draw.line(tela, cor, (x, y), (x + 3, y - int(bater)), 1)
 
     # --- mira, arco e a previa da trajetoria ---
     def _vel_flecha_atual(self):

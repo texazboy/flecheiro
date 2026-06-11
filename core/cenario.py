@@ -170,11 +170,15 @@ class Fundo:
 # Terreno: a fase inteira (chao + plataformas + decoracao) numa superficie so.
 # ---------------------------------------------------------------------------
 def montar_terreno(largura_mundo, solidos, plataformas, recursos, semente=1, tema="dia"):
+    """Pre-renderiza o chao da fase inteira. Devolve (superficie, luzes_fixas):
+    as luzes sao a posicao dos cogumelos luminosos que nascem de noite, pra
+    fase plugar no sistema de iluminacao."""
     sup = pygame.Surface((largura_mundo, config.ALTURA), pygame.SRCALPHA)
     grama = recursos.tile_grama()
     terra = recursos.tile_terra()
     tabua = recursos.tile_plataforma()
     rnd = random.Random(semente)
+    luzes_fixas = []
 
     clip_antigo = sup.get_clip()
     for s in solidos:
@@ -191,7 +195,9 @@ def montar_terreno(largura_mundo, solidos, plataformas, recursos, semente=1, tem
             sup.blit(tabua, (tx, p.top))
     sup.set_clip(clip_antigo)
 
-    # decoracao em cima do chao: tufos de grama, florzinhas e pedrinhas
+    # decoracao em cima do chao: tufos, flores, pedrinhas, arbustos e, de
+    # noite, cogumelos que brilham (viram fonte de luz na fase)
+    noite = (tema == "noite")
     for s in solidos:
         if s.width < 40:
             continue  # pilares e paredes ficam sem enfeite
@@ -199,19 +205,29 @@ def montar_terreno(largura_mundo, solidos, plataformas, recursos, semente=1, tem
         while x < s.right - 6:
             sorte = rnd.random()
             topo = s.top
-            if sorte < 0.30:
+            if sorte < 0.26:
                 pygame.draw.line(sup, config.VERDE, (x, topo - 3), (x, topo), 1)
                 pygame.draw.line(sup, config.VERDE, (x + 2, topo - 2), (x + 2, topo), 1)
-            elif sorte < 0.42:
+            elif sorte < 0.36:
                 cor_flor = rnd.choice(((232, 120, 140), (240, 220, 120), (170, 150, 230)))
                 pygame.draw.line(sup, config.VERDE_ESCURO, (x, topo - 3), (x, topo), 1)
                 pygame.draw.rect(sup, cor_flor, (x - 1, topo - 5, 3, 3))
-            elif sorte < 0.50:
+            elif sorte < 0.44:
                 pygame.draw.rect(sup, config.CINZA, (x, topo + 2, 2, 2))
+            elif sorte < 0.52:
+                # arbusto: dois montinhos de verde
+                pygame.draw.ellipse(sup, config.VERDE_ESCURO, (x - 4, topo - 6, 12, 7))
+                pygame.draw.ellipse(sup, config.VERDE, (x - 1, topo - 4, 7, 5))
+            elif noite and sorte < 0.58:
+                # cogumelo luminoso
+                pygame.draw.rect(sup, (210, 230, 220), (x, topo - 3, 1, 3))
+                pygame.draw.rect(sup, (130, 230, 200), (x - 2, topo - 5, 5, 3))
+                pygame.draw.rect(sup, (200, 255, 240), (x - 1, topo - 5, 1, 1))
+                luzes_fixas.append((x, topo - 4, 22, (110, 200, 180)))
             x += rnd.randint(10, 26)
 
     # tinta da hora do dia (deixa o chao combinar com o ceu)
     tinta = TEMAS.get(tema, TEMAS["dia"])["tinta"]
     if tinta:
         sup.fill(tinta, special_flags=pygame.BLEND_RGB_MULT)
-    return sup
+    return sup, luzes_fixas

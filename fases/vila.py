@@ -20,6 +20,7 @@ from core.estados import Estado
 from core.camera import Camera
 from core import som
 from core.cenario import Fundo, montar_terreno
+from core.luz import Luzes, AMBIENTE
 from entidades.jogador import Jogador
 from entidades.efeitos import fumaca
 from fases.npc import NPC
@@ -79,8 +80,10 @@ class Vila(Estado):
         self.camera = Camera(config.LARGURA, config.ALTURA, self.largura_mundo)
         self.hud = HUD(self.mundo, self.recursos)
         self.fundo = Fundo(self.recursos, "noite", semente=5)
-        self.terreno = montar_terreno(self.largura_mundo, self.solidos, [],
-                                      self.recursos, semente=11, tema="noite")
+        self.terreno, self.luzes_fixas = montar_terreno(
+            self.largura_mundo, self.solidos, [], self.recursos,
+            semente=11, tema="noite")
+        self.luzes = Luzes(AMBIENTE["noite"])
         self._desenhar_cenario_fixo()
 
         self.particulas = []
@@ -101,6 +104,8 @@ class Vila(Estado):
 
     # ------------------------------------------------- cenario pre-renderizado
     def _desenhar_cenario_fixo(self):
+        """Casas e postes entram direto na superficie do terreno; os pontos de
+        luz (janelas e lampadas) vao pra lista que alimenta a iluminacao."""
         sup = self.terreno
         for cx, _ in _CASAS:
             self._desenhar_casa(sup, cx)
@@ -118,25 +123,20 @@ class Vila(Estado):
         pygame.draw.rect(sup, config.MARROM, (x + 30, chao - 30, 16, 30))    # porta
         pygame.draw.rect(sup, (50, 38, 32), (x + 30, chao - 30, 16, 30), 1)
         sup.set_at((x + 43, chao - 16), config.AMARELO)                      # macaneta
-        # janela acesa com um halo quente (e noite, fica um charme)
+        # janela acesa: o brilho de verdade vem do sistema de iluminacao
         janela = pygame.Rect(x + 9, chao - 48, 12, 12)
-        halo = pygame.Surface((36, 36), pygame.SRCALPHA)
-        pygame.draw.circle(halo, (255, 214, 130, 38), (18, 18), 17)
-        sup.blit(halo, (janela.centerx - 18, janela.centery - 18))
         pygame.draw.rect(sup, (255, 222, 140), janela)
         pygame.draw.rect(sup, (60, 46, 38), janela, 1)
         pygame.draw.line(sup, (60, 46, 38), (janela.centerx, janela.top),
                          (janela.centerx, janela.bottom - 1), 1)
+        self.luzes_fixas.append((janela.centerx, janela.centery, 36, (255, 205, 130)))
 
     def _desenhar_poste(self, sup, x):
         chao = self.chao_y
         pygame.draw.rect(sup, (70, 72, 84), (x, chao - 46, 3, 46))
-        halo = pygame.Surface((44, 44), pygame.SRCALPHA)
-        pygame.draw.circle(halo, (255, 226, 150, 34), (22, 22), 21)
-        pygame.draw.circle(halo, (255, 226, 150, 26), (22, 22), 13)
-        sup.blit(halo, (x - 21, chao - 70))
         pygame.draw.rect(sup, config.AMARELO, (x - 2, chao - 52, 7, 6))
         pygame.draw.rect(sup, (60, 60, 70), (x - 2, chao - 52, 7, 6), 1)
+        self.luzes_fixas.append((x + 1, chao - 49, 60, (255, 222, 150)))
 
     # ----------------------------------------------------------- eventos
     def tratar_evento(self, evento):
@@ -222,13 +222,22 @@ class Vila(Estado):
 
         for p in self.particulas:
             p.desenhar(tela, self.camera)
-        self._desenhar_vagalumes(tela)
 
         proximo = self._npc_proximo()
         for npc in self.npcs:
             npc.desenhar(tela, self.camera, destacar=(npc is proximo))
 
         self.jogador.desenhar(tela, self.camera)
+
+        # iluminacao da noite: lampadas, janelas, portal e a luz do arqueiro
+        self.luzes.adicionar(self.jogador.rect.centerx, self.jogador.rect.centery,
+                             72, (255, 226, 185))
+        self.luzes.adicionar(self.porta.centerx, self.porta.centery, 48, (215, 160, 255))
+        for x, y, raio, cor in self.luzes_fixas:
+            self.luzes.adicionar(x, y, raio, cor)
+        self.luzes.aplicar(tela, self.camera)
+
+        self._desenhar_vagalumes(tela)   # eles brilham por conta propria
 
         dica = "E: conversar / seguir   |   I: inventario"
         self.hud.desenhar(tela, dica, "Vila")
