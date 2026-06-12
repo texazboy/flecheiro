@@ -19,7 +19,7 @@ from entidades.flecha import Flecha
 
 
 class Jogador:
-    ALTURA_DESENHO = 24  # altura do sprite desenhado (a hitbox e fixa, abaixo)
+    ALTURA_DESENHO = 27  # altura do sprite desenhado (a hitbox e fixa, abaixo)
 
     def __init__(self, x, y, recursos):
         self.recursos = recursos

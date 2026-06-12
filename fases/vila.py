@@ -112,9 +112,26 @@ class Vila(Estado):
             self._desenhar_casa(sup, cx)
         for px in _POSTES:
             self._desenhar_poste(sup, px)
+        # props extras quando os pngs existem: poco entre as casas e o alvo
+        # de treino do arqueiro perto da entrada
+        poco = self.recursos.sprite_opcional("poco", 46)
+        if poco is not None:
+            sup.blit(poco, (770 - poco.get_width() // 2, self.chao_y - poco.get_height()))
+        alvo = self.recursos.sprite_opcional("alvo", 24)
+        if alvo is not None:
+            sup.blit(alvo, (84 - alvo.get_width() // 2, self.chao_y - alvo.get_height()))
+        banco = self.recursos.sprite_opcional("banco", 18)
+        if banco is not None:
+            sup.blit(banco, (700 - banco.get_width() // 2, self.chao_y - banco.get_height()))
 
     def _desenhar_casa(self, sup, x):
         chao = self.chao_y
+        # casa.png em assets/ substitui a casinha procedural
+        img = self.recursos.sprite_opcional("casa", 88)
+        if img is not None:
+            sup.blit(img, (x + 38 - img.get_width() // 2, chao - img.get_height()))
+            self.luzes_fixas.append((x + 38, chao - 42, 38, (255, 205, 130)))
+            return
         parede = (82, 64, 54)
         pygame.draw.rect(sup, parede, (x, chao - 60, 76, 60))
         pygame.draw.rect(sup, (66, 50, 42), (x, chao - 60, 76, 60), 1)
@@ -144,6 +161,11 @@ class Vila(Estado):
 
     def _desenhar_poste(self, sup, x):
         chao = self.chao_y
+        img = self.recursos.sprite_opcional("poste", 52)
+        if img is not None:
+            sup.blit(img, (x + 1 - img.get_width() // 2, chao - img.get_height()))
+            self.luzes_fixas.append((x + 1, chao - 46, 60, (255, 222, 150)))
+            return
         pygame.draw.rect(sup, (70, 72, 84), (x, chao - 46, 3, 46))
         pygame.draw.rect(sup, config.AMARELO, (x - 2, chao - 52, 7, 6))
         pygame.draw.rect(sup, (60, 60, 70), (x - 2, chao - 52, 7, 6), 1)

@@ -169,6 +169,12 @@ class Fase(Estado):
         for r, _txt in self.placas:
             self.terreno.blit(sprite_placa, (r.centerx - 8, self.chao_y - 16))
         self._desenhar_barris(self.porta.left - 22, self.chao_y)
+        # na fase noturna, uma lapide perto do primeiro vao (aviso... tarde demais)
+        if numero == 3:
+            lapide = self.recursos.sprite_opcional("lapide", 16)
+            if lapide is not None:
+                self.terreno.blit(lapide, (478 - lapide.get_width() // 2,
+                                           self.chao_y - lapide.get_height()))
 
         # cache das sombras de contato (elipse escura nos pes)
         self._sombras = {}
@@ -210,20 +216,31 @@ class Fase(Estado):
         tipo, drop, x, extra = dados
         if tipo == "voo":
             return InimigoVoador(x, extra, self.recursos, dropa=drop)
-        return Inimigo(x, self.chao_y - 18, self.recursos, dropa=drop, alcance=extra)
+        return Inimigo(x, self.chao_y - 15, self.recursos, dropa=drop, alcance=extra)
 
     def _desenhar_barris(self, x, chao):
-        """Barril + caixote encostados na saida (cantinho de bagagem)."""
+        """Barril + caixote encostados na saida. Cada um usa o png de assets/
+        se existir; senao sai a versao desenhada na mao."""
         t = self.terreno
-        pygame.draw.rect(t, (66, 44, 28), (x, chao - 14, 12, 14))        # barril
-        pygame.draw.rect(t, (108, 74, 44), (x + 1, chao - 13, 10, 12))
-        pygame.draw.line(t, (60, 40, 26), (x + 1, chao - 10), (x + 10, chao - 10), 1)
-        pygame.draw.line(t, (60, 40, 26), (x + 1, chao - 5), (x + 10, chao - 5), 1)
+        img_b = self.recursos.sprite_opcional("barril", 14)
+        img_c = self.recursos.sprite_opcional("caixote", 13)
+
+        if img_b is not None:
+            t.blit(img_b, (x, chao - img_b.get_height()))
+        else:
+            pygame.draw.rect(t, (66, 44, 28), (x, chao - 14, 12, 14))
+            pygame.draw.rect(t, (108, 74, 44), (x + 1, chao - 13, 10, 12))
+            pygame.draw.line(t, (60, 40, 26), (x + 1, chao - 10), (x + 10, chao - 10), 1)
+            pygame.draw.line(t, (60, 40, 26), (x + 1, chao - 5), (x + 10, chao - 5), 1)
+
         cx = x - 13
-        pygame.draw.rect(t, (66, 44, 28), (cx, chao - 11, 12, 11))       # caixote
-        pygame.draw.rect(t, (120, 86, 52), (cx + 1, chao - 10, 10, 9))
-        pygame.draw.line(t, (66, 44, 28), (cx + 1, chao - 10), (cx + 10, chao - 2), 1)
-        pygame.draw.line(t, (66, 44, 28), (cx + 10, chao - 10), (cx + 1, chao - 2), 1)
+        if img_c is not None:
+            t.blit(img_c, (cx - img_c.get_width() + 12, chao - img_c.get_height()))
+        else:
+            pygame.draw.rect(t, (66, 44, 28), (cx, chao - 11, 12, 11))
+            pygame.draw.rect(t, (120, 86, 52), (cx + 1, chao - 10, 10, 9))
+            pygame.draw.line(t, (66, 44, 28), (cx + 1, chao - 10), (cx + 10, chao - 2), 1)
+            pygame.draw.line(t, (66, 44, 28), (cx + 10, chao - 10), (cx + 1, chao - 2), 1)
 
     def _sombra(self, tela, rect_mundo):
         """Elipse de sombra nos pes (igual jogo HD-2D, aterra os sprites)."""
@@ -338,7 +355,7 @@ class Fase(Estado):
                     self.moedas.append(Moeda(inim.rect.centerx, inim.rect.centery,
                                              self.recursos))
                 self.particulas += explosao(inim.rect.centerx, inim.rect.centery,
-                                            config.VERMELHO, 12)
+                                            inim.cor_explosao, 12)
                 self.ondas.append(Onda(inim.rect.centerx, inim.rect.centery, 20))
                 self.camera.sacudir(3)
                 self.hitstop = 0.05

@@ -139,6 +139,30 @@ class Recursos:
             self._cache_img["fundo"] = self._tentar_png("fundo")  # pode ser None
         return self._cache_img["fundo"]
 
+    def fundo_camadas(self):
+        """Camadas de parallax de verdade (fundo1.png, fundo2.png, fundo3.png).
+        Quando existem, substituem as montanhas procedurais."""
+        if "fundo_camadas" not in self._cache_img:
+            camadas = []
+            for i in (1, 2, 3):
+                img = self._tentar_png(f"fundo{i}")
+                if img is not None:
+                    camadas.append(self._escalar_para_altura(img, config.ALTURA))
+            self._cache_img["fundo_camadas"] = camadas
+        return self._cache_img["fundo_camadas"]
+
+    def sprite_opcional(self, nome, altura=None):
+        """Sprite que so existe se o usuario colocar o png (casa, poste, arvore,
+        barril, caixote...). Devolve None quando nao ha arquivo - quem chama
+        cai no desenho procedural."""
+        chave = (nome, altura)
+        if chave not in self._cache_img:
+            img = self._tentar_png(nome)
+            if img is not None and altura:
+                img = self._escalar_para_altura(img, altura)
+            self._cache_img[chave] = img
+        return self._cache_img[chave]
+
     # =================================================================
     # Geradores de placeholder (usados quando nao ha arte na pasta)
     # =================================================================
@@ -267,8 +291,8 @@ class Recursos:
 
     def _frames_inimigo(self, estado):
         """Slime: gota arredondada com contorno, brilho e carinha."""
-        corpo = (198, 78, 70)
-        escuro = (118, 38, 38)
+        corpo = (104, 186, 88)
+        escuro = (46, 104, 50)
         quadros = []
         for sq in (0, 1, 0, -1):  # leve "squash" pra parecer vivo
             s = self._nova(16, 18)
@@ -277,7 +301,7 @@ class Recursos:
             corpo_rect = pygame.Rect(1, topo, 14, alt)
             pygame.draw.ellipse(s, escuro, corpo_rect)                      # contorno
             pygame.draw.ellipse(s, corpo, corpo_rect.inflate(-2, -2))
-            pygame.draw.ellipse(s, (224, 120, 104),
+            pygame.draw.ellipse(s, (164, 224, 140),
                                 (corpo_rect.left + 2, corpo_rect.top + 1, 6, 4))  # brilho
             olho_y = topo + alt // 2 - 2
             pygame.draw.rect(s, config.BRANCO, (5, olho_y, 2, 3))

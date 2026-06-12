@@ -19,8 +19,9 @@ import config
 
 class Inimigo:
     def __init__(self, x, y, recursos, dropa="madeira", alcance=48, vida=2, velocidade=0.7):
-        self.rect = pygame.Rect(x, y, 16, 18)   # hitbox fixa
-        self.anim = recursos.animacao("inimigo", "andar", 18, fps=6)
+        # hitbox mais larga que alta: combina com o corpo achatado do slime
+        self.rect = pygame.Rect(x, y, 20, 15)
+        self.anim = recursos.animacao("inimigo", "andar", 15, fps=6)
         self.origem_x = x
         self.alcance = alcance
         self.vx = velocidade
@@ -30,6 +31,7 @@ class Inimigo:
         self.morto = False
         self.dropa = dropa
         self.flash = 0.0   # pisca branco quando leva uma flechada
+        self.cor_explosao = (124, 200, 96)   # gosma verde de slime
 
     def atualizar(self, dt, fase):
         # patrulha: vira quando passa do limite
@@ -101,6 +103,7 @@ class InimigoVoador:
         self.morto = False
         self.dropa = dropa
         self.flash = 0.0
+        self.cor_explosao = (150, 110, 180)   # poeira roxa de morcego
         self._x_anterior = float(x)
         self.anim = recursos.animacao("voador", "voar", 12, fps=9)
 

@@ -85,6 +85,15 @@ class Fundo:
         self.nuvens = self._montar_nuvens(rnd) if self.tema["nuvens"] else []
         self.raios = self._montar_raios() if tema == "dia" else None
 
+        # se o usuario colocou camadas de parallax de verdade (fundo1..3.png),
+        # elas entram no lugar das montanhas procedurais
+        externas = recursos.fundo_camadas()
+        if externas:
+            fatores_ext = (0.2, 0.45, 0.7)
+            self.camadas = [(img, fatores_ext[min(i, 2)])
+                            for i, img in enumerate(externas)]
+            self.nuvens = []
+
     # ------------------------------------------------------------ construcao
     def _montar_ceu(self, rnd):
         ceu = pygame.Surface((config.LARGURA, config.ALTURA))
@@ -199,8 +208,14 @@ class Fundo:
 # ---------------------------------------------------------------------------
 # Terreno: a fase inteira (chao + plataformas + decoracao) numa superficie so.
 # ---------------------------------------------------------------------------
-def _arvore(sup, x, base_y, rnd):
-    """Arvore de copa redonda em tres tons, com contorno (fica atras do jogo)."""
+def _arvore(sup, x, base_y, rnd, recursos=None):
+    """Arvore de copa redonda em tres tons, com contorno (fica atras do jogo).
+    Se existir arvore.png em assets/, usa ela no lugar."""
+    if recursos is not None:
+        img = recursos.sprite_opcional("arvore", rnd.choice((56, 68, 80)))
+        if img is not None:
+            sup.blit(img, (x - img.get_width() // 2, base_y - img.get_height()))
+            return
     alt = rnd.randint(40, 58)
     topo = base_y - alt
     contorno = (26, 42, 30)
@@ -253,7 +268,7 @@ def montar_terreno(largura_mundo, solidos, plataformas, recursos, semente=1, tem
         x = s.left + 130
         while x < s.right - 150:
             if rnd.random() < 0.6:
-                _arvore(sup, x, s.top, rnd)
+                _arvore(sup, x, s.top, rnd, recursos)
             x += rnd.randint(150, 300)
 
     # decoracao em cima do chao: tufos, flores, pedrinhas, arbustos e, de

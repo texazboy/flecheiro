@@ -1,27 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-Importador de sprites do pacote "Pixel Adventure" (Pixel Frog, CC0).
+Importador de sprites: pega os pacotes baixados (gratis) e copia tudo pra
+assets/ com os nomes que o jogo espera. Um comando por pacote:
 
-O que ele faz: copia o heroi e um inimigo do pacote para a pasta assets/ com os
-nomes que o jogo espera. Os quadros do Pixel Adventure sao 32x32 QUADRADOS, entao
-o jogo deduz a quantidade de quadros sozinho (nao precisa por numero no nome).
+  python assets/importar_sprites.py huntress "C:\\...\\Huntress"
+      heroi arqueira de verdade (LuizMelo, CC0). Recorta a borda vazia dos
+      quadros automaticamente e gera jogador_parado/andar/pulo/atirar.
 
-COMO USAR
----------
-1) Baixe e extraia o pacote (gratis, CC0):
-   https://pixelfrog-assets.itch.io/pixel-adventure-1
-2) Rode apontando para a pasta extraida:
-   python assets/importar_sprites.py "C:\\caminho\\para\\Pixel Adventure 1"
-3) Rode o jogo:
-   python main.py
+  python assets/importar_sprites.py pa1 "C:\\...\\Pixel Adventure 1"
+      heroi alternativo (Ninja Frog e cia, Pixel Frog, CC0).
 
-Quer outro personagem/inimigo? Troque as constantes PERSONAGEM / INIMIGO abaixo
-(nomes das pastas dentro do pacote, ex.: "Mask Dude", "Pink Man", "Virtual Guy"
-para o heroi; "Mushroom", "Chicken", "Slime", etc. para o inimigo). Se o inimigo
-escolhido nao existir, o script pega o primeiro inimigo que encontrar.
+  python assets/importar_sprites.py pa2 "C:\\...\\Pixel Adventure 2"
+      inimigos: Slime -> terrestre, Bat -> voador (espelhados pra direita).
+
+  python assets/importar_sprites.py tesouro "C:\\...\\Treasure Hunters"
+      bau fechado/aberto e moeda (Pixel Frog, CC0).
+
+Fundo em camadas (vnitti etc.): nao precisa de comando - renomeie as camadas
+pra fundo1.png, fundo2.png, fundo3.png (da mais distante pra mais proxima).
+Props (Cainos etc.): renomeie pra casa.png, poste.png, arvore.png, barril.png,
+caixote.png, placa.png. O jogo pega tudo sozinho.
 """
 
 import os
+import re
 import sys
 import glob
 import shutil
@@ -31,93 +33,144 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame
 
-# --- escolha do heroi e do inimigo (nomes de pasta dentro do pacote) ---
-PERSONAGEM = "Ninja Frog"
-INIMIGO = "Mushroom"
-
-# Os inimigos do Pixel Adventure costumam olhar para a ESQUERDA; o jogo espera
-# arte virada para a DIREITA. Se o inimigo aparecer invertido no jogo, troque
-# este valor para False.
-ESPELHAR_INIMIGO = True
-
 PASTA_ASSETS = os.path.dirname(os.path.abspath(__file__))
 
 
+# ------------------------------------------------------------------ ajudantes
 def achar(raiz, *partes):
-    """Procura recursivamente um arquivo (tolera nomes com espacos/parenteses)."""
     achados = glob.glob(os.path.join(raiz, "**", *partes), recursive=True)
-    return achados[0] if achados else None
+    return sorted(achados)[0] if achados else None
 
 
-def copiar(origem, destino):
-    shutil.copyfile(origem, destino)
-    print(f"  OK  {os.path.basename(destino)}  <-  {os.path.basename(origem)}")
+def fatiar(sheet, larg_quadro):
+    alt = sheet.get_height()
+    n = max(1, sheet.get_width() // larg_quadro)
+    return [sheet.subsurface((i * larg_quadro, 0, larg_quadro, alt)).copy()
+            for i in range(n)]
 
 
-def copiar_espelhado(origem, destino):
-    """Copia uma tira horizontal espelhando CADA quadro (mantendo a ordem)."""
-    sheet = pygame.image.load(origem)
-    h = sheet.get_height()
-    n = max(1, sheet.get_width() // h)  # quadros quadrados
-    nova = pygame.Surface((sheet.get_width(), h), pygame.SRCALPHA)
-    for i in range(n):
-        quadro = sheet.subsurface((i * h, 0, h, h))
-        nova.blit(pygame.transform.flip(quadro, True, False), (i * h, 0))
-    pygame.image.save(nova, destino)
-    print(f"  OK  {os.path.basename(destino)}  <-  {os.path.basename(origem)}  (espelhado)")
+def largura_do_nome(caminho, sheet):
+    """Pixel Frog poe o tamanho no nome: 'Run (32x32).png'. Sem isso, assume
+    quadros quadrados."""
+    m = re.search(r"\((\d+)x(\d+)\)", os.path.basename(caminho))
+    if m:
+        return int(m.group(1))
+    return sheet.get_height()
+
+
+def salvar_tira(quadros, destino, espelhar=False):
+    larg = quadros[0].get_width()
+    alt = quadros[0].get_height()
+    tira = pygame.Surface((larg * len(quadros), alt), pygame.SRCALPHA)
+    for i, q in enumerate(quadros):
+        if espelhar:
+            q = pygame.transform.flip(q, True, False)
+        tira.blit(q, (i * larg, 0))
+    nome = f"{destino}_{len(quadros)}.png"
+    pygame.image.save(tira, os.path.join(PASTA_ASSETS, nome))
+    print(f"  OK  {nome}")
+
+
+def importar_tira(origem, destino, espelhar=False):
+    if origem is None:
+        print(f"  --  nao achei a animacao de {destino} (fica o placeholder)")
+        return False
+    sheet = pygame.image.load(origem).convert_alpha()
+    quadros = fatiar(sheet, largura_do_nome(origem, sheet))
+    salvar_tira(quadros, destino, espelhar)
+    return True
+
+
+def recortar_quadros(quadros):
+    """Tira a borda transparente comum a todos os quadros (mantem o alinhamento).
+    Essencial pros personagens do LuizMelo, que vem com muito espaco vazio."""
+    uniao = None
+    for q in quadros:
+        r = q.get_bounding_rect()
+        uniao = r if uniao is None else uniao.union(r)
+    if uniao is None or uniao.width == 0:
+        return quadros
+    return [q.subsurface(uniao).copy() for q in quadros]
+
+
+# ------------------------------------------------------------------ pacotes
+def pacote_huntress(raiz):
+    print("Huntress (LuizMelo, CC0) -> heroi arqueira")
+    mapa = [("Idle*.png", "jogador_parado"), ("Run*.png", "jogador_andar"),
+            ("Jump*.png", "jogador_pulo"), ("Attack1*.png", "jogador_atirar")]
+    for padrao, destino in mapa:
+        origem = achar(raiz, padrao)
+        if origem is None:
+            print(f"  --  nao achei {padrao}")
+            continue
+        sheet = pygame.image.load(origem).convert_alpha()
+        quadros = recortar_quadros(fatiar(sheet, largura_do_nome(origem, sheet)))
+        salvar_tira(quadros, destino)
+    # limpa os nomes antigos sem contagem, se existirem (senao tem dois jogadores)
+    for velho in ("jogador_parado.png", "jogador_andar.png",
+                  "jogador_pulo.png", "jogador_atirar.png"):
+        caminho = os.path.join(PASTA_ASSETS, velho)
+        if os.path.exists(caminho):
+            os.remove(caminho)
+            print(f"  (removi o antigo {velho})")
+
+
+def pacote_pa1(raiz, personagem="Ninja Frog"):
+    print(f"Pixel Adventure 1 (CC0) -> heroi {personagem}")
+    mapa = [("Idle*.png", "jogador_parado"), ("Run*.png", "jogador_andar"),
+            ("Jump*.png", "jogador_pulo"), ("Idle*.png", "jogador_atirar")]
+    for padrao, destino in mapa:
+        importar_tira(achar(raiz, "Main Characters", personagem, padrao), destino)
+
+
+def pacote_pa2(raiz):
+    print("Pixel Adventure 2 (CC0) -> inimigos")
+    origem = achar(raiz, "Enemies", "Slime", "Idle-Run*.png") or \
+        achar(raiz, "Enemies", "Slime", "*.png")
+    importar_tira(origem, "inimigo_andar", espelhar=True)
+    origem = achar(raiz, "Enemies", "Bat", "Flying*.png") or \
+        achar(raiz, "Enemies", "Bat", "*.png")
+    importar_tira(origem, "voador_voar", espelhar=True)
+
+
+def pacote_tesouro(raiz):
+    print("Treasure Hunters (Pixel Frog, CC0) -> bau e moeda")
+    origem = achar(raiz, "*Chest*.png")
+    if origem:
+        sheet = pygame.image.load(origem).convert_alpha()
+        quadros = fatiar(sheet, largura_do_nome(origem, sheet))
+        pygame.image.save(quadros[0], os.path.join(PASTA_ASSETS, "bau_fechado.png"))
+        pygame.image.save(quadros[-1], os.path.join(PASTA_ASSETS, "bau_aberto.png"))
+        print("  OK  bau_fechado.png / bau_aberto.png")
+    else:
+        print("  --  nao achei *Chest*.png")
+    origem = achar(raiz, "*Gold Coin*.png") or achar(raiz, "*Coin*.png")
+    if origem:
+        sheet = pygame.image.load(origem).convert_alpha()
+        quadros = fatiar(sheet, largura_do_nome(origem, sheet))
+        pygame.image.save(quadros[0], os.path.join(PASTA_ASSETS, "moeda.png"))
+        print("  OK  moeda.png")
+    else:
+        print("  --  nao achei *Coin*.png")
+
+
+PACOTES = {"huntress": pacote_huntress, "pa1": pacote_pa1,
+           "pa2": pacote_pa2, "tesouro": pacote_tesouro}
 
 
 def main():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3 or sys.argv[1].lower() not in PACOTES:
         print(__doc__)
-        print("ERRO: informe a pasta do pacote. Ex.:")
-        print('  python assets/importar_sprites.py "C:\\...\\Pixel Adventure 1"')
         return
-    raiz = sys.argv[1]
+    raiz = sys.argv[2]
     if not os.path.isdir(raiz):
         print(f"ERRO: pasta nao encontrada: {raiz}")
         return
-
     pygame.init()
     pygame.display.set_mode((1, 1))
-
-    # --- heroi (ja vem virado para a direita) ---
-    print(f"Heroi: {PERSONAGEM}")
-    mapa_heroi = {
-        "jogador_parado.png": ("Main Characters", PERSONAGEM, "Idle*.png"),
-        "jogador_andar.png":  ("Main Characters", PERSONAGEM, "Run*.png"),
-        "jogador_pulo.png":   ("Main Characters", PERSONAGEM, "Jump*.png"),
-        "jogador_atirar.png": ("Main Characters", PERSONAGEM, "Idle*.png"),  # sem "atirar" no pacote
-    }
-    for destino, partes in mapa_heroi.items():
-        origem = achar(raiz, *partes)
-        if origem:
-            copiar(origem, os.path.join(PASTA_ASSETS, destino))
-        else:
-            print(f"  --  nao achei {partes[-1]} para {PERSONAGEM} (vai usar placeholder)")
-
-    # --- inimigo (com fallback: se nao achar o escolhido, pega qualquer um) ---
-    print(f"Inimigo: {INIMIGO}")
-    origem = achar(raiz, "Enemies", INIMIGO, "Run*.png") or achar(raiz, "Enemies", INIMIGO, "Idle*.png")
-    if not origem:
-        alt = (glob.glob(os.path.join(raiz, "**", "Enemies", "*", "Run*.png"), recursive=True)
-               or glob.glob(os.path.join(raiz, "**", "Enemies", "*", "Idle*.png"), recursive=True))
-        if alt:
-            origem = alt[0]
-            print(f"  (nao achei '{INIMIGO}'; usando '{os.path.basename(os.path.dirname(origem))}')")
-
-    destino = os.path.join(PASTA_ASSETS, "inimigo_andar.png")
-    if origem:
-        if ESPELHAR_INIMIGO:
-            copiar_espelhado(origem, destino)
-        else:
-            copiar(origem, destino)
-    else:
-        print("  --  nenhum inimigo encontrado no pacote (vai usar placeholder)")
-
+    PACOTES[sys.argv[1].lower()](raiz)
     pygame.quit()
-    print("\nPronto! Agora rode:  python main.py")
-    print("Dica: se o heroi ficar pequeno, aumente ALTURA_DESENHO em entidades/jogador.py")
+    print("\nPronto! Rode: python main.py")
 
 
 if __name__ == "__main__":
