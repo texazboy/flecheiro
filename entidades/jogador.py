@@ -38,9 +38,9 @@ class Jogador:
 
         alt = self.ALTURA_DESENHO
         self.animacoes = {
-            "parado": recursos.animacao("jogador", "parado", alt, fps=4),
-            "andar": recursos.animacao("jogador", "andar", alt, fps=8),
-            "atirar": recursos.animacao("jogador", "atirar", alt, fps=10, repetir=False),
+            "parado": recursos.animacao("jogador", "parado", alt, fps=6),
+            "andar": recursos.animacao("jogador", "andar", alt, fps=10),
+            "atirar": recursos.animacao("jogador", "atirar", alt, fps=12, repetir=False),
             "pulo": recursos.animacao("jogador", "pulo", alt, fps=1),
         }
         self.estado_anim = "parado"

@@ -95,17 +95,36 @@ def recortar_quadros(quadros):
 
 # ------------------------------------------------------------------ pacotes
 def pacote_huntress(raiz):
+    """Importante: TODAS as animacoes sao recortadas pela MESMA caixa (uniao
+    dos corpos em idle/run/jump). Se cada uma tiver caixa propria, a escala da
+    personagem muda a cada troca de estado e ela parece vibrar no jogo. O
+    Attack1 usa a mesma caixa - a lanca arremessada e cortada de proposito,
+    porque o projetil de verdade quem desenha e o jogo."""
     print("Huntress (LuizMelo, CC0) -> heroi arqueira")
     mapa = [("Idle*.png", "jogador_parado"), ("Run*.png", "jogador_andar"),
             ("Jump*.png", "jogador_pulo"), ("Attack1*.png", "jogador_atirar")]
+    anims = {}
     for padrao, destino in mapa:
         origem = achar(raiz, padrao)
         if origem is None:
             print(f"  --  nao achei {padrao}")
             continue
         sheet = pygame.image.load(origem).convert_alpha()
-        quadros = recortar_quadros(fatiar(sheet, largura_do_nome(origem, sheet)))
-        salvar_tira(quadros, destino)
+        anims[destino] = fatiar(sheet, largura_do_nome(origem, sheet))
+
+    caixa = None
+    for destino in ("jogador_parado", "jogador_andar", "jogador_pulo"):
+        for q in anims.get(destino, []):
+            r = q.get_bounding_rect()
+            caixa = r if caixa is None else caixa.union(r)
+    if caixa is None:
+        print("  --  nenhuma animacao encontrada")
+        return
+
+    for destino, quadros in anims.items():
+        cortados = [q.subsurface(caixa).copy() for q in quadros]
+        salvar_tira(cortados, destino)
+
     # limpa os nomes antigos sem contagem, se existirem (senao tem dois jogadores)
     for velho in ("jogador_parado.png", "jogador_andar.png",
                   "jogador_pulo.png", "jogador_atirar.png"):
@@ -133,6 +152,23 @@ def pacote_pa2(raiz):
     importar_tira(origem, "voador_voar", espelhar=True)
 
 
+def pacote_monstros(raiz):
+    """Monsters Creatures Fantasy 2: Slime -> inimigo, Bat -> voador.
+    Aqui o recorte por animacao e seguro: cada bicho tem UMA animacao so,
+    entao nao existe troca de estado pra escala variar."""
+    print("Monsters Creatures Fantasy 2 -> inimigos")
+    origem = achar(raiz, "Slime", "walk.png")
+    if origem:
+        sheet = pygame.image.load(origem).convert_alpha()
+        quadros = recortar_quadros(fatiar(sheet, largura_do_nome(origem, sheet)))
+        salvar_tira(quadros, "inimigo_andar", espelhar=True)
+    origem = achar(raiz, "Bat", "fly.png")
+    if origem:
+        sheet = pygame.image.load(origem).convert_alpha()
+        quadros = recortar_quadros(fatiar(sheet, largura_do_nome(origem, sheet)))
+        salvar_tira(quadros, "voador_voar", espelhar=True)
+
+
 def pacote_tesouro(raiz):
     print("Treasure Hunters (Pixel Frog, CC0) -> bau e moeda")
     origem = achar(raiz, "*Chest*.png")
@@ -154,8 +190,8 @@ def pacote_tesouro(raiz):
         print("  --  nao achei *Coin*.png")
 
 
-PACOTES = {"huntress": pacote_huntress, "pa1": pacote_pa1,
-           "pa2": pacote_pa2, "tesouro": pacote_tesouro}
+PACOTES = {"huntress": pacote_huntress, "pa1": pacote_pa1, "pa2": pacote_pa2,
+           "monstros": pacote_monstros, "tesouro": pacote_tesouro}
 
 
 def main():
