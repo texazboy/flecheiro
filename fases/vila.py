@@ -32,9 +32,7 @@ from telas.tela_inventario import TelaInventario
 from telas.pausa import Pausa
 from telas import comum
 
-# (x da casa, x da chamine)
-_CASAS = [(120, 178), (370, 428), (580, 638)]
-_POSTES = [300, 720]
+_POSTES = [330, 720]   # postes de luz da vila
 
 
 class Vila(Estado):
@@ -108,8 +106,9 @@ class Vila(Estado):
         """Casas e postes entram direto na superficie do terreno; os pontos de
         luz (janelas e lampadas) vao pra lista que alimenta a iluminacao."""
         sup = self.terreno
-        for cx, _ in _CASAS:
-            self._desenhar_casa(sup, cx)
+        self.chamines = []                 # (x, y) de cada chamine, pra fumaca
+        for npc in self.npcs:              # cada casa atras do seu NPC
+            self._desenhar_casa(sup, npc)
         for px in _POSTES:
             self._desenhar_poste(sup, px)
         # props extras quando os pngs existem: poco entre as casas e o alvo
@@ -124,30 +123,57 @@ class Vila(Estado):
         if banco is not None:
             sup.blit(banco, (700 - banco.get_width() // 2, self.chao_y - banco.get_height()))
 
-    def _desenhar_casa(self, sup, x):
+    def _desenhar_casa(self, sup, npc):
+        """Desenha a casa atras do NPC. Usa casa_<tipo>.png (loja/ferreiro/
+        aldeao) se existir; senao uma casinha procedural distinta por tipo."""
         chao = self.chao_y
-        # casa.png em assets/ substitui a casinha procedural
-        img = self.recursos.sprite_opcional("casa", 88)
+        cx = npc.rect.centerx
+        img = self.recursos.sprite_opcional("casa_" + npc.tipo, 158)
         if img is not None:
-            sup.blit(img, (x + 38 - img.get_width() // 2, chao - img.get_height()))
-            self.luzes_fixas.append((x + 38, chao - 42, 38, (255, 205, 130)))
+            sup.blit(img, (cx - img.get_width() // 2, chao - img.get_height()))
+            self.chamines.append((cx + int(img.get_width() * 0.18),
+                                  chao - img.get_height() + 10))
+            self.luzes_fixas.append((cx, chao - 72, 64, (255, 205, 140)))
             return
-        parede = (82, 64, 54)
-        pygame.draw.rect(sup, parede, (x, chao - 60, 76, 60))
-        pygame.draw.rect(sup, (66, 50, 42), (x, chao - 60, 76, 60), 1)
-        pygame.draw.polygon(sup, (148, 62, 58), [(x - 7, chao - 60), (x + 83, chao - 60),
-                                                 (x + 38, chao - 88)])
-        pygame.draw.rect(sup, (110, 110, 118), (x + 52, chao - 84, 8, 18))   # chamine
-        pygame.draw.rect(sup, config.MARROM, (x + 30, chao - 30, 16, 30))    # porta
-        pygame.draw.rect(sup, (50, 38, 32), (x + 30, chao - 30, 16, 30), 1)
-        sup.set_at((x + 43, chao - 16), config.AMARELO)                      # macaneta
-        # janela acesa: o brilho de verdade vem do sistema de iluminacao
-        janela = pygame.Rect(x + 9, chao - 48, 12, 12)
+        self._casa_procedural(sup, cx, npc.tipo)
+
+    def _casa_procedural(self, sup, cx, tipo):
+        chao = self.chao_y
+        left = cx - 38
+        pedra = (tipo == "ferreiro")
+        parede = (96, 96, 104) if pedra else (172, 120, 96)
+        teto = {"lojista": (150, 70, 64), "ferreiro": (70, 84, 110),
+                "aldeao": (150, 110, 160)}.get(tipo, (148, 62, 58))
+        pygame.draw.rect(sup, parede, (left, chao - 60, 76, 60))
+        pygame.draw.rect(sup, (56, 46, 42), (left, chao - 60, 76, 60), 1)
+        pygame.draw.polygon(sup, teto, [(left - 7, chao - 60), (left + 83, chao - 60),
+                                        (left + 38, chao - 90)])
+        pygame.draw.rect(sup, (108, 100, 96), (left + 54, chao - 86, 8, 20))   # chamine
+        self.chamines.append((left + 58, chao - 84))
+        pygame.draw.rect(sup, config.MARROM, (left + 30, chao - 30, 16, 30))   # porta
+        pygame.draw.rect(sup, (50, 38, 32), (left + 30, chao - 30, 16, 30), 1)
+        sup.set_at((left + 43, chao - 16), config.AMARELO)                     # macaneta
+        janela = pygame.Rect(left + 9, chao - 48, 12, 12)                      # janela acesa
         pygame.draw.rect(sup, (255, 222, 140), janela)
         pygame.draw.rect(sup, (60, 46, 38), janela, 1)
         pygame.draw.line(sup, (60, 46, 38), (janela.centerx, janela.top),
                          (janela.centerx, janela.bottom - 1), 1)
-        self.luzes_fixas.append((janela.centerx, janela.centery, 36, (255, 205, 130)))
+        # detalhe que identifica cada NPC
+        if tipo == "lojista":                                  # toldo listrado
+            for i in range(7):
+                cor = config.VERMELHO if i % 2 == 0 else config.BRANCO
+                pygame.draw.rect(sup, cor, (left + 7 + i * 3, chao - 51, 3, 4))
+        elif tipo == "ferreiro":                               # placa de ferradura
+            pygame.draw.rect(sup, (70, 54, 40), (left + 49, chao - 55, 13, 11))
+            pygame.draw.arc(sup, (210, 210, 220), (left + 51, chao - 53, 9, 9),
+                            0.3, 2.85, 2)
+        elif tipo == "aldeao":                                 # guirlanda na porta
+            pygame.draw.circle(sup, (70, 120, 70), (left + 38, chao - 22), 5, 2)
+            for ang in (0, 2, 4):
+                px = left + 38 + int(math.cos(ang) * 5)
+                py = chao - 22 + int(math.sin(ang) * 5)
+                pygame.draw.rect(sup, config.VERMELHO, (px, py, 2, 2))
+        self.luzes_fixas.append((janela.centerx, janela.centery, 40, (255, 205, 130)))
 
     def _sombra(self, tela, rect_mundo):
         larg = rect_mundo.width + 4
@@ -237,10 +263,10 @@ class Vila(Estado):
 
         # fumaca subindo das chamines
         self._timer_fumaca += dt
-        if self._timer_fumaca > 0.45:
+        if self._timer_fumaca > 0.45 and self.chamines:
             self._timer_fumaca = 0.0
-            _, chamine_x = random.choice(_CASAS)
-            self.particulas.append(fumaca(chamine_x + 4, self.chao_y - 86))
+            cx, cy = random.choice(self.chamines)
+            self.particulas.append(fumaca(cx, cy))
         for p in self.particulas:
             p.atualizar(dt)
         self.particulas = [p for p in self.particulas if not p.morta]
