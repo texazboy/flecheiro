@@ -51,8 +51,14 @@ Estados usados pelo jogo:
   jogador_andar(_N).png     andando
   jogador_atirar(_N).png    atirando (toca uma vez)
   jogador_pulo(_N).png      no ar
-  inimigo_andar(_N).png     inimigo terrestre andando
+  inimigo_andar(_N).png     inimigo terrestre (slime) andando
   voador_voar(_N).png       inimigo voador (morcego) batendo asas
+  corredor_andar(_N).png    inimigo rato que investe
+
+FONTE (opcional, deixa o texto pixelado e nitido)
+-------------------------------------------------
+  monogram.ttf    fonte pixel; se existir, o jogo usa ela em tudo (sem ela,
+                  cai na fonte embutida do pygame).
 
 (Se faltar algum estado, o jogo usa o placeholder so daquele estado.)
 

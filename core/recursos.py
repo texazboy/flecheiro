@@ -33,11 +33,20 @@ class Recursos:
         self._cache_fonte = {}
         self._cache_frames = {}
         self._cache_tile = {}
+        # fonte pixel monogram (CC0) se estiver em assets/, senao a embutida
+        caminho_fonte = os.path.join(pasta_assets, "monogram.ttf")
+        self._arquivo_fonte = caminho_fonte if os.path.exists(caminho_fonte) else None
+        self.fonte_pixel = self._arquivo_fonte is not None
 
     # ------------------------------------------------------------------ fontes
     def fonte(self, tamanho):
         if tamanho not in self._cache_fonte:
-            self._cache_fonte[tamanho] = pygame.font.Font(None, tamanho)
+            if self._arquivo_fonte:
+                # monogram fica crocante em tamanhos um pouco maiores
+                self._cache_fonte[tamanho] = pygame.font.Font(self._arquivo_fonte,
+                                                              int(tamanho * 1.15))
+            else:
+                self._cache_fonte[tamanho] = pygame.font.Font(None, tamanho)
         return self._cache_fonte[tamanho]
 
     # ------------------------------------------------------------------ helpers

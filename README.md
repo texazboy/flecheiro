@@ -58,12 +58,22 @@ estrutura, a flecha **finca e vira uma pequena plataforma**: é assim que se
 escala a parede da fase 2 e se atravessam os vãos da fase 3 (a flecha fincada
 na beirada funciona de ponte).
 
-São **três fases** (dia, poente e noite), com a vila entre elas. Inimigos
-terrestres patrulham o chão e morcegos rondam os pontos altos. Derrotar
-inimigos solta **moedas** (coleta automática, com efeito ímã) além dos
-materiais; **baús de tesouro** escondidos nos pontos altos guardam materiais
-raros, e **placas** pelo caminho dão dicas (leia com `E`). Os efeitos sonoros
-e a música de fundo são gerados pelo próprio código (sem arquivos de áudio).
+São **três fases** (dia, poente e noite), com a vila entre elas, e o cenário é
+recheado de mecânicas:
+
+- **Plataformas móveis** (azuladas, com setas) que te carregam de carona.
+- **Plataformas frágeis** que tremem e desmoronam quando você pisa — atravesse
+  no ritmo.
+- **Inimigos variados:** slime terrestre, morcego voador e o **rato corredor**,
+  que dispara uma investida quando te vê.
+- **Combo de abates:** derrotar inimigos em sequência aumenta o combo e chove
+  mais moeda.
+- Derrotar inimigos solta **moedas** (coleta automática, com efeito ímã);
+  **baús de tesouro** nos pontos altos guardam materiais raros; e **placas**
+  pelo caminho dão dicas (leia com `E`).
+
+Os efeitos sonoros e a música de fundo são gerados pelo próprio código (sem
+arquivos de áudio).
 
 ## Algoritmos implementados (e onde aparecem)
 
@@ -146,6 +156,8 @@ e cite a fonte nos créditos.
   - Baú e moedas — **Treasure Hunters**, *Pixel Frog* (CC0) — [itch.io](https://pixelfrog-assets.itch.io/treasure-hunters)
   - Cenário de fundo — **Grassy Mountains**, *vnitti* — [itch.io](https://vnitti.itch.io/grassy-mountains-parallax-background)
   - Props da vila (árvore, poço, poste, banco...) — **Village Props**, *Cainos* — [itch.io](https://cainos.itch.io/pixel-art-platformer-village-props)
-- O que não vem de pacote (NPCs, itens, tiles, interface) é desenhado
-  proceduralmente pelo próprio jogo.
+  - Rato corredor — *Monsters Creatures Fantasy* (gratuito)
+  - Fonte **monogram** — *datagoblin* (CC0) — [itch.io](https://datagoblin.itch.io/monogram)
+- O que não vem de pacote (NPCs, itens, tiles, interface, plataformas) é
+  desenhado proceduralmente pelo próprio jogo.
 - Feito com [pygame-ce](https://pyga.me/).

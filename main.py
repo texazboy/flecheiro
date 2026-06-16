@@ -41,6 +41,10 @@ class Jogo:
 
         pasta_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
         self.recursos = Recursos(pasta_assets)
+        # fonte pixel (monogram) renderiza melhor sem suavizacao
+        if self.recursos.fonte_pixel:
+            from telas import comum
+            comum.ANTIALIAS = False
         self.mundo = Mundo()
 
         self.vinheta = self._montar_vinheta()

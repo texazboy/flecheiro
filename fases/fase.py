@@ -25,8 +25,9 @@ from core import som
 from core.cenario import Fundo, montar_terreno
 from core.luz import Luzes, AMBIENTE
 from entidades.jogador import Jogador
-from entidades.inimigo import Inimigo, InimigoVoador
+from entidades.inimigo import Inimigo, InimigoVoador, InimigoCorredor
 from entidades.item import ItemNoChao, Moeda, Bau, MATERIAIS
+from entidades.plataformas import PlataformaMovel, PlataformaFragil
 from entidades.efeitos import explosao, faisca, poeira, Onda, TextoFlutuante
 from telas.hud import HUD
 from telas.tela_inventario import TelaInventario
@@ -39,11 +40,14 @@ TEMA_POR_FASE = {1: "dia", 2: "poente", 3: "noite"}
 
 
 def _layout(numero):
-    """Dados de montagem de cada fase. Inimigos: ("chao", drop, x, alcance)
-    patrulha no chao; ("voo", drop, x, y) paira em volta do ponto."""
+    """Dados de montagem de cada fase.
+    Inimigos: ("chao", drop, x, alcance) anda no chao; ("voo", drop, x, y) paira;
+    ("corre", drop, x, alcance) e o rato que investe.
+    moveis:  (x, y, largura, eixo 'h'/'v', amplitude, periodo)
+    frageis: (x, y, largura) - desmoronam quando voce pisa."""
     chao_y = 240
     if numero == 1:
-        largura = 1600
+        largura = 1750
         solidos = [
             pygame.Rect(0, chao_y, largura, 60),     # chao corrido
             pygame.Rect(900, 150, 16, 90),           # pilar pra treinar a escalada
@@ -51,44 +55,54 @@ def _layout(numero):
         plataformas = [
             pygame.Rect(260, 195, 70, 10),
             pygame.Rect(430, 165, 70, 10),
+            pygame.Rect(560, 135, 60, 10),           # escadinha continua
             pygame.Rect(820, 95, 130, 10),           # plataforma alta (bonus)
+            pygame.Rect(1520, 150, 80, 10),
         ]
+        moveis = [(1080, 150, 64, "h", 90, 3.6)]     # ponte movel sobre o caminho
+        frageis = [(1300, 175, 40), (1370, 175, 40)] # pulinho de ritmo
         inimigos = [("chao", "madeira", 200, 48), ("chao", "pena", 560, 40),
-                    ("voo", "pena", 700, 120),
-                    ("chao", "couro", 1150, 60), ("chao", "ferro", 1350, 50)]
+                    ("voo", "pena", 700, 120), ("corre", "couro", 1180, 80),
+                    ("chao", "ferro", 1430, 50)]
         itens = [("couro", 650, 226), ("madeira", 1250, 226),
                  ("madeira", 320, 186), ("pena", 470, 156),
-                 ("cristal", 866, 86), ("ferro", 884, 86)]
+                 ("cristal", 866, 86), ("ferro", 884, 86), ("pena", 1555, 140)]
         baus = [(900, 95, ("ferro", "couro"))]          # premio da plataforma alta
         placas = [(140, "Atire flechas nas paredes: da pra subir em cima delas!"),
                   (840, "A plataforma la em cima guarda um bau. Escale com flechas.")]
         dica = "Segure o mouse pra tensionar o arco  |  E coleta  |  T rota  |  I inventario"
     elif numero == 2:
-        largura = 1700
+        largura = 1800
         solidos = [
             pygame.Rect(0, chao_y, largura, 60),
             pygame.Rect(780, 90, 24, 150),           # parede alta: escalada obrigatoria
         ]
         plataformas = [
             pygame.Rect(300, 185, 70, 10),
+            pygame.Rect(470, 150, 60, 10),
             pygame.Rect(1050, 175, 90, 10),
             pygame.Rect(1250, 140, 90, 10),
+            pygame.Rect(1620, 120, 80, 10),
         ]
-        inimigos = [("chao", "couro", 250, 60), ("chao", "ferro", 500, 50),
-                    ("voo", "pena", 880, 70),
-                    ("chao", "ferro", 1120, 60), ("chao", "cristal", 1460, 50)]
+        moveis = [(900, 150, 60, "v", 64, 3.0),      # elevador apos a parede
+                  (1400, 165, 64, "h", 80, 4.0)]
+        frageis = [(560, 150, 40), (630, 130, 40)]   # subida fragil paralela
+        inimigos = [("chao", "couro", 250, 60), ("corre", "couro", 480, 70),
+                    ("voo", "pena", 880, 70), ("chao", "ferro", 1120, 60),
+                    ("voo", "pena", 1300, 90), ("chao", "cristal", 1560, 50)]
         itens = [("ferro", 250, 226), ("madeira", 360, 168),
-                 ("couro", 1080, 162), ("cristal", 1300, 128)]
+                 ("couro", 1080, 162), ("cristal", 1300, 128), ("ferro", 1640, 108)]
         baus = [(792, 90, ("cristal", "pena"))]         # no topo da parede
-        placas = [(700, "Parede alta demais? Finque flechas nela e use de escada.")]
+        placas = [(700, "Parede alta demais? Finque flechas nela e use de escada."),
+                  (1360, "Plataforma azul anda sozinha - suba e pegue carona.")]
         dica = "A parede bloqueia o caminho: finque flechas nela e suba!"
     else:
-        largura = 2000
+        largura = 2150
         solidos = [
             # chao com VAOS: cair neles machuca; flecha fincada vira ponte
             pygame.Rect(0, chao_y, 520, 60),
             pygame.Rect(600, chao_y, 460, 60),
-            pygame.Rect(1140, chao_y, 860, 60),
+            pygame.Rect(1140, chao_y, 1010, 60),
             pygame.Rect(900, 120, 24, 120),          # torre 1
             pygame.Rect(1500, 90, 24, 150),          # torre 2 (mais alta)
         ]
@@ -97,12 +111,17 @@ def _layout(numero):
             pygame.Rect(700, 170, 80, 10),
             pygame.Rect(1250, 180, 80, 10),
             pygame.Rect(1620, 140, 90, 10),
+            pygame.Rect(1850, 175, 80, 10),
         ]
+        moveis = [(1040, 150, 64, "h", 70, 3.2),     # ponte movel sobre o 2o vao
+                  (1700, 120, 56, "v", 60, 3.4)]
+        frageis = [(540, 200, 44), (560, 175, 44)]   # atravessar o 1o vao no susto
         inimigos = [("chao", "couro", 300, 60), ("voo", "pena", 560, 150),
-                    ("chao", "ferro", 800, 70), ("voo", "pena", 1100, 130),
-                    ("voo", "pena", 1450, 80), ("chao", "cristal", 1700, 80)]
+                    ("corre", "couro", 800, 70), ("voo", "pena", 1100, 130),
+                    ("corre", "ferro", 1300, 80), ("voo", "pena", 1500, 80),
+                    ("chao", "cristal", 1850, 80)]
         itens = [("ferro", 250, 226), ("cristal", 912, 106), ("madeira", 740, 152),
-                 ("couro", 1280, 162), ("cristal", 1512, 76), ("ferro", 1900, 226)]
+                 ("couro", 1280, 162), ("cristal", 1512, 76), ("ferro", 2050, 226)]
         baus = [(1660, 140, ("cristal", "ferro"))]      # na plataforma alta final
         placas = [(450, "Vaos a frente! Uma flecha fincada na beirada vira ponte."),
                   (1180, "Falta pouco. As tochas marcam o caminho.")]
@@ -110,8 +129,8 @@ def _layout(numero):
 
     porta = pygame.Rect(largura - 80, chao_y - 60, 24, 60)
     return dict(largura=largura, solidos=solidos, plataformas=plataformas,
-                inimigos=inimigos, itens=itens, baus=baus, placas=placas,
-                porta=porta, chao_y=chao_y, dica=dica)
+                moveis=moveis, frageis=frageis, inimigos=inimigos, itens=itens,
+                baus=baus, placas=placas, porta=porta, chao_y=chao_y, dica=dica)
 
 
 class Fase(Estado):
@@ -127,6 +146,8 @@ class Fase(Estado):
         self.chao_y = dados["chao_y"]
         self.solidos = dados["solidos"]
         self.plataformas = dados["plataformas"]
+        self.moveis = [PlataformaMovel(*m) for m in dados["moveis"]]
+        self.frageis = [PlataformaFragil(*f) for f in dados["frageis"]]
         self.porta = dados["porta"]
         self.dica = dados["dica"]
         self.pos_inicial = (40, self.chao_y - 24)
@@ -191,6 +212,10 @@ class Fase(Estado):
         self._timer_porta = 0.0
         self._aviso_carga = False
 
+        # combo de abates: matar em sequencia rapida da ouro extra
+        self.combo = 0
+        self.combo_timer = 0.0
+
         # vida ambiente: folhas de dia, brasas no poente, vagalumes de noite
         self.ondas = []
         self.folhas = []
@@ -216,6 +241,8 @@ class Fase(Estado):
         tipo, drop, x, extra = dados
         if tipo == "voo":
             return InimigoVoador(x, extra, self.recursos, dropa=drop)
+        if tipo == "corre":
+            return InimigoCorredor(x, self.chao_y - 14, self.recursos, dropa=drop, alcance=extra)
         return Inimigo(x, self.chao_y - 15, self.recursos, dropa=drop, alcance=extra)
 
     def _desenhar_barris(self, x, chao):
@@ -261,8 +288,12 @@ class Fase(Estado):
         return s
 
     def plataformas_uma_via(self):
-        """Plataformas que so seguram por cima = flutuantes + flechas fincadas."""
-        return self.plataformas + [f.plataforma_rect() for f in self.flechas if f.fincada]
+        """Plataformas que so seguram por cima: flutuantes + flechas fincadas +
+        moveis + frageis (so enquanto ainda nao cairam)."""
+        return (self.plataformas
+                + [f.plataforma_rect() for f in self.flechas if f.fincada]
+                + [m.rect for m in self.moveis]
+                + [f.rect for f in self.frageis if f.solida])
 
     # ----------------------------------------------------------- eventos
     def tratar_evento(self, evento):
@@ -335,10 +366,24 @@ class Fase(Estado):
             self._aviso_carga = False
         self.jogador.mirando = self.carregando
 
+        # plataformas dinamicas mexem ANTES do jogador (pra ele colidir na
+        # posicao nova) e o carregamento acontece DEPOIS
+        for m in self.moveis:
+            m.atualizar(dt)
+        for f in self.frageis:
+            f.atualizar(dt)
+
         if not self.jogador.no_chao:
             self._vy_queda = max(self._vy_queda, self.jogador.vy)
         self.jogador.atualizar(dt, self)
+        self._carregar_plataformas()
         self._efeitos_de_movimento(dt)
+
+        # combo: a janela vai fechando com o tempo
+        if self.combo_timer > 0:
+            self.combo_timer -= dt
+            if self.combo_timer <= 0:
+                self.combo = 0
 
         for f in self.flechas:
             f.atualizar(dt, self)
@@ -351,9 +396,17 @@ class Fase(Estado):
             inim.atualizar(dt, self)
             if inim.morto:
                 self._dropar(inim)
-                for _ in range(random.randint(2, 3)):
+                # combo: cada abate dentro da janela aumenta e da moeda extra
+                self.combo += 1
+                self.combo_timer = 2.6
+                qtd_moedas = random.randint(2, 3) + self.combo // 2
+                for _ in range(qtd_moedas):
                     self.moedas.append(Moeda(inim.rect.centerx, inim.rect.centery,
                                              self.recursos))
+                if self.combo >= 2:
+                    self.textos.append(TextoFlutuante(inim.rect.centerx,
+                                       inim.rect.top - 6, f"COMBO x{self.combo}",
+                                       config.AMARELO, self.recursos))
                 self.particulas += explosao(inim.rect.centerx, inim.rect.centery,
                                             inim.cor_explosao, 12)
                 self.ondas.append(Onda(inim.rect.centerx, inim.rect.centery, 20))
@@ -426,6 +479,28 @@ class Fase(Estado):
                     som.tocar("acerto")
                     f.morta = True
                     break
+
+    def _carregar_plataformas(self):
+        """Cola o jogador na plataforma movel em que ele esta (anda junto) e
+        avisa as frageis que foram pisadas. Chamado logo apos jogador.atualizar."""
+        jog = self.jogador
+        if jog.vy < 0:
+            return
+        for m in self.moveis:
+            if (abs(jog.rect.bottom - m.rect.top) <= 3
+                    and jog.rect.right > m.rect.left + 1
+                    and jog.rect.left < m.rect.right - 1):
+                jog.rect.x += m.dx
+                jog.rect.bottom = m.rect.top
+                jog.rect.left = max(0, jog.rect.left)
+                jog.vy = 0
+                jog.no_chao = True
+                break
+        for f in self.frageis:
+            if (f.solida and abs(jog.rect.bottom - f.rect.top) <= 3
+                    and jog.rect.right > f.rect.left + 1
+                    and jog.rect.left < f.rect.right - 1):
+                f.pisada()
 
     def _dropar(self, inim):
         material = MATERIAIS[inim.dropa]
@@ -571,6 +646,13 @@ class Fase(Estado):
             self._desenhar_passaro(tela, p, agora)
         tela.blit(self.terreno, self.camera.origem())
 
+        # plataformas dinamicas (atras das entidades)
+        tile_plat = self.recursos.tile_plataforma()
+        for m in self.moveis:
+            m.desenhar(tela, self.camera, tile_plat)
+        for f in self.frageis:
+            f.desenhar(tela, self.camera, tile_plat)
+
         # porta de saida com brilho pulsante
         porta = self.camera.aplicar(self.porta)
         pulso = 120 + int(60 * math.sin(agora * 4.0))
@@ -589,7 +671,7 @@ class Fase(Estado):
         if self.jogador.no_chao:
             self._sombra(tela, self.jogador.rect)
         for inim in self.inimigos:
-            if isinstance(inim, Inimigo):
+            if not isinstance(inim, InimigoVoador):
                 self._sombra(tela, inim.rect)
         for bau in self.baus:
             self._sombra(tela, bau.rect)
@@ -625,6 +707,16 @@ class Fase(Estado):
 
         if self.mostrar_rota:
             self._desenhar_rota(tela)
+
+        # contador de combo: cresce e "respira" enquanto a janela esta aberta
+        if self.combo >= 2:
+            fonte = self.recursos.fonte(20 + min(self.combo, 6))
+            cor = config.AMARELO if self.combo < 5 else config.LARANJA
+            comum.texto(tela, fonte, f"COMBO x{self.combo}", config.LARGURA // 2,
+                        58, cor, centro=True)
+            # barrinha da janela do combo, sumindo
+            larg = int(60 * (self.combo_timer / 2.6))
+            pygame.draw.rect(tela, cor, (config.LARGURA // 2 - 30, 70, larg, 2))
 
         self.hud.desenhar(tela, self.dica, f"Fase {self.numero}/{TOTAL_FASES}")
 

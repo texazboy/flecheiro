@@ -26,6 +26,10 @@ FUNDO_PAINEL = (52, 46, 52)
 
 _cache_texto = {}
 
+# desligado quando a fonte pixel (monogram) esta ativa - pixel font fica nitida
+# sem suavizacao. Definido pelo main na inicializacao.
+ANTIALIAS = True
+
 
 def _render(fonte, msg, cor):
     chave = (id(fonte), msg, cor)
@@ -33,7 +37,7 @@ def _render(fonte, msg, cor):
     if img is None:
         if len(_cache_texto) > 400:
             _cache_texto.clear()
-        img = fonte.render(msg, True, cor)
+        img = fonte.render(msg, ANTIALIAS, cor)
         _cache_texto[chave] = img
     return img
 

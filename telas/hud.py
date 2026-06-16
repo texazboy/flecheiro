@@ -42,9 +42,24 @@ class HUD:
     def __init__(self, mundo, recursos):
         self.mundo = mundo
         self.fonte = recursos.fonte(16)
-        self.coracao_cheio = _desenhar_mapa(_MAPA_CORACAO, config.VERMELHO, brilho=True)
-        self.coracao_claro = _desenhar_mapa(_MAPA_CORACAO, (255, 120, 110), brilho=True)
-        self.coracao_vazio = _desenhar_mapa(_MAPA_CORACAO, (58, 50, 66))
+        # coracao do Cryo's Mini GUI se existir; senao o desenhado na mao
+        img = recursos.sprite_opcional("coracao")
+        if img is not None:
+            img = pygame.transform.scale(img, (10, 10))
+            self.coracao_cheio = img
+            claro = img.copy()
+            claro.fill((40, 40, 40), special_flags=pygame.BLEND_RGB_ADD)
+            self.coracao_claro = claro
+            vazio = img.copy()
+            vazio.fill((90, 90, 90, 255), special_flags=pygame.BLEND_RGBA_MULT)
+            vazio.fill((30, 26, 34), special_flags=pygame.BLEND_RGB_ADD)
+            self.coracao_vazio = vazio
+            self._passo_coracao = 11
+        else:
+            self.coracao_cheio = _desenhar_mapa(_MAPA_CORACAO, config.VERMELHO, brilho=True)
+            self.coracao_claro = _desenhar_mapa(_MAPA_CORACAO, (255, 120, 110), brilho=True)
+            self.coracao_vazio = _desenhar_mapa(_MAPA_CORACAO, (58, 50, 66))
+            self._passo_coracao = 10
         self.moeda = self._fazer_moeda()
         self.placa = self._fazer_placa(126, 44)
         self.faixa_dica = self._fazer_faixa_dica()
@@ -121,7 +136,7 @@ class HUD:
                     img = self.coracao_cheio
             else:
                 img = self.coracao_vazio
-            tela.blit(img, (9 + i * 10, 8))
+            tela.blit(img, (9 + i * self._passo_coracao, 7))
 
         # ouro
         tela.blit(self.moeda, (9, 19))
