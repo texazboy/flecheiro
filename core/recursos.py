@@ -413,6 +413,26 @@ class Recursos:
         s.set_at((2, 2), (255, 240, 180))
         return s
 
+    def sprite_runa(self):
+        """Estrela dourada de 5 pontas (alvo do Desafio da Rota / TSP)."""
+        if "runa" not in self._cache_img:
+            img = self._tentar_png("runa")
+            if img is None:
+                import math
+                s = self._nova(13, 13)
+                cx, cy = 6, 6
+                pts = []
+                for i in range(10):
+                    ang = -math.pi / 2 + i * math.pi / 5
+                    r = 6 if i % 2 == 0 else 2.7
+                    pts.append((cx + math.cos(ang) * r, cy + math.sin(ang) * r))
+                pygame.draw.polygon(s, config.AMARELO, pts)
+                pygame.draw.polygon(s, (255, 240, 180), pts, 1)
+                s.set_at((5, 4), (255, 255, 255))
+                img = s
+            self._cache_img["runa"] = self._escalar_para_altura(img, 13)
+        return self._cache_img["runa"]
+
     def sprite_placa(self):
         if "placa" not in self._cache_img:
             img = self._tentar_png("placa") or self._placeholder_placa()

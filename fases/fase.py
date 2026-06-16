@@ -26,7 +26,7 @@ from core.cenario import Fundo, montar_terreno
 from core.luz import Luzes, AMBIENTE
 from entidades.jogador import Jogador
 from entidades.inimigo import Inimigo, InimigoVoador, InimigoCorredor
-from entidades.item import ItemNoChao, Moeda, Bau, MATERIAIS
+from entidades.item import ItemNoChao, Moeda, Bau, Runa, MATERIAIS
 from entidades.plataformas import PlataformaMovel, PlataformaFragil
 from entidades.fogueira import Fogueira
 from entidades.efeitos import explosao, faisca, poeira, Onda, TextoFlutuante
@@ -34,7 +34,7 @@ from telas.hud import HUD
 from telas.tela_inventario import TelaInventario
 from telas.pausa import Pausa
 from telas import comum
-from algoritmos.tsp import resolver_tsp
+from algoritmos.tsp import resolver_tsp, custo_rota
 
 TOTAL_FASES = 3
 TEMA_POR_FASE = {1: "dia", 2: "poente", 3: "noite"}
@@ -69,9 +69,11 @@ def _layout(numero):
                  ("madeira", 320, 186), ("pena", 470, 156),
                  ("cristal", 866, 86), ("ferro", 884, 86), ("pena", 1555, 140)]
         baus = [(900, 95, ("ferro", "couro"))]          # premio da plataforma alta
-        placas = [(140, "Atire flechas nas paredes: da pra subir em cima delas!"),
-                  (840, "A plataforma la em cima guarda um bau. Escale com flechas.")]
-        dica = "Segure o mouse pra tensionar o arco  |  E coleta  |  T rota  |  I inventario"
+        # runas do Desafio da Rota (TSP): espalhadas, pra ordem importar
+        runas = [(300, 175), (575, 120), (835, 80), (1090, 135), (1520, 135)]
+        placas = [(140, "Aperte T: a linha mostra a rota OTIMA pelas runas douradas."),
+                  (840, "Colete as runas na melhor ordem pra ganhar mais estrelas!")]
+        dica = "Mouse mira/atira  |  E coleta  |  T rota otima  |  I inventario"
     elif numero == 2:
         largura = 1800
         solidos = [
@@ -94,6 +96,7 @@ def _layout(numero):
         itens = [("ferro", 250, 226), ("madeira", 360, 168),
                  ("couro", 1080, 162), ("cristal", 1300, 128), ("ferro", 1640, 108)]
         baus = [(792, 90, ("cristal", "pena"))]         # no topo da parede
+        runas = [(300, 165), (470, 130), (1050, 155), (1250, 120), (1620, 100)]
         placas = [(700, "Parede alta demais? Finque flechas nela e use de escada."),
                   (1360, "Plataforma azul anda sozinha - suba e pegue carona.")]
         dica = "A parede bloqueia o caminho: finque flechas nela e suba!"
@@ -124,6 +127,7 @@ def _layout(numero):
         itens = [("ferro", 250, 226), ("cristal", 912, 106), ("madeira", 740, 152),
                  ("couro", 1280, 162), ("cristal", 1512, 76), ("ferro", 2050, 226)]
         baus = [(1660, 140, ("cristal", "ferro"))]      # na plataforma alta final
+        runas = [(380, 160), (700, 150), (912, 100), (1250, 160), (1620, 120), (1850, 155)]
         placas = [(450, "Vaos a frente! Uma flecha fincada na beirada vira ponte."),
                   (1180, "Falta pouco. As tochas marcam o caminho.")]
         dica = "Noite fechada: cuidado com os vaos - a flecha fincada vira ponte!"
@@ -132,8 +136,8 @@ def _layout(numero):
     fogueira_x = {1: 850, 2: 900, 3: 660}[numero]   # checkpoint no meio do caminho
     return dict(largura=largura, solidos=solidos, plataformas=plataformas,
                 moveis=moveis, frageis=frageis, inimigos=inimigos, itens=itens,
-                baus=baus, placas=placas, porta=porta, chao_y=chao_y, dica=dica,
-                fogueira_x=fogueira_x)
+                baus=baus, runas=runas, placas=placas, porta=porta, chao_y=chao_y,
+                dica=dica, fogueira_x=fogueira_x)
 
 
 class Fase(Estado):
@@ -161,6 +165,13 @@ class Fase(Estado):
                       for (ch, x, y) in dados["itens"]]
         self.baus = [Bau(x, y, conteudo, self.recursos)
                      for (x, y, conteudo) in dados["baus"]]
+        # Desafio da Rota (TSP): runas + rastreio da ordem de coleta do jogador
+        self.runas = [Runa(x, y, self.recursos) for (x, y) in dados["runas"]]
+        self.total_runas = len(self.runas)
+        self.ponto_inicial = (self.pos_inicial[0] + 8, self.pos_inicial[1] + 12)
+        self.ordem_jogador = [self.ponto_inicial]    # pontos na ordem coletada
+        self.resultado_rota = None                   # banner do resultado final
+        self._timer_rota = 0.0                       # tempo mostrando o banner
         self.placas = [(pygame.Rect(x - 10, self.chao_y - 18, 20, 18), txt)
                        for (x, txt) in dados["placas"]]
         self.fogueira = Fogueira(dados["fogueira_x"], self.chao_y, self.recursos)
@@ -432,6 +443,24 @@ class Fase(Estado):
         for it in self.itens:
             it.atualizar(dt)
 
+        # Desafio da Rota (TSP): coleta runas ao encostar e registra a ordem
+        for runa in self.runas:
+            runa.atualizar(dt)
+            if not runa.coletada and self.jogador.rect.colliderect(runa.rect.inflate(6, 6)):
+                runa.coletada = True
+                self.ordem_jogador.append(runa.centro)
+                self.particulas += explosao(runa.rect.centerx, runa.rect.centery,
+                                            config.AMARELO, 9)
+                som.tocar("coleta")
+                self.textos.append(TextoFlutuante(
+                    runa.rect.centerx, runa.rect.top - 4,
+                    f"Runa {len(self.ordem_jogador) - 1}/{self.total_runas}",
+                    config.AMARELO, self.recursos))
+                if all(r.coletada for r in self.runas) and self.runas:
+                    self._concluir_rota()
+        if self._timer_rota > 0:
+            self._timer_rota -= dt
+
         # fogueira-checkpoint: acende, vira ponto de renascimento e cura 1 coracao
         self.fogueira.atualizar(dt)
         if self.tem_portal:
@@ -482,8 +511,9 @@ class Fase(Estado):
 
         self._atualizar_ambiente(dt)
 
-        # rota do TSP fica desatualizada quando um item some -> recalcula
-        if self.mostrar_rota and len(self.itens) != len(self._itens_rota):
+        # a rota do TSP some uma runa coletada -> recalcula a otima das restantes
+        restantes = sum(1 for r in self.runas if not r.coletada)
+        if self.mostrar_rota and restantes != len(self._itens_rota):
             self._recalcular_rota()
 
         self.camera.seguir(self.jogador.rect)
@@ -654,9 +684,34 @@ class Fase(Estado):
             self.camera.sacudir(5)
 
     def _recalcular_rota(self):
-        self._itens_rota = list(self.itens)
-        pontos = [self.jogador.rect.center] + [it.centro for it in self._itens_rota]
+        # rota otima pelas runas que ainda faltam, partindo do jogador
+        self._itens_rota = [r for r in self.runas if not r.coletada]
+        pontos = [self.jogador.rect.center] + [r.centro for r in self._itens_rota]
         self.resultado_tsp = resolver_tsp(pontos)
+
+    def _concluir_rota(self):
+        """Compara a rota que o jogador FEZ com a otima (TSP) e da estrelas."""
+        pts = self.ordem_jogador
+        if len(pts) >= 3:
+            meu = custo_rota(list(range(len(pts))), pts)
+            otimo = resolver_tsp(pts).custo
+            eff = min(1.0, otimo / meu) if meu > 0 else 1.0
+        else:
+            meu = otimo = 0.0
+            eff = 1.0
+        estrelas = 3 if eff >= 0.95 else 2 if eff >= 0.80 else 1
+        bonus = estrelas * 15
+        self.mundo.ouro += bonus
+        self.mundo.estrelas_rota += estrelas
+        for _ in range(estrelas * 3):
+            self.moedas.append(Moeda(self.jogador.rect.centerx,
+                                     self.jogador.rect.centery, self.recursos))
+        self.resultado_rota = dict(eff=eff, estrelas=estrelas, bonus=bonus,
+                                   meu=meu, otimo=otimo)
+        self._timer_rota = 5.0
+        self.mostrar_rota = False
+        som.tocar("forja")
+        self.camera.sacudir(3)
 
     def _avancar(self):
         som.tocar("porta")
@@ -715,6 +770,9 @@ class Fase(Estado):
             bau.desenhar(tela, self.camera)
         for it in self.itens:
             it.desenhar(tela, self.camera)
+        for runa in self.runas:
+            if not runa.coletada:
+                runa.desenhar(tela, self.camera)
         for m in self.moedas:
             m.desenhar(tela, self.camera)
         for inim in self.inimigos:
@@ -753,10 +811,40 @@ class Fase(Estado):
             larg = int(60 * (self.combo_timer / 2.6))
             pygame.draw.rect(tela, cor, (config.LARGURA // 2 - 30, 70, larg, 2))
 
+        self._desenhar_rota_hud(tela)
         self.hud.desenhar(tela, self.dica, f"Fase {self.numero}/{TOTAL_FASES}")
 
         if self.overlay is not None:
             self.overlay.desenhar(tela)
+
+    def _desenhar_rota_hud(self, tela):
+        """Contador de runas (canto direito) e o banner de resultado do desafio."""
+        fonte = self.recursos.fonte(15)
+        coletadas = self.total_runas - sum(1 for r in self.runas if not r.coletada)
+        if self.total_runas and self.resultado_rota is None:
+            # estrelinha + progresso, abaixo do indicador de fase
+            comum.texto(tela, fonte, f"Runas {coletadas}/{self.total_runas}  [T] rota",
+                        config.LARGURA - 6 - fonte.size(f"Runas {coletadas}/{self.total_runas}  [T] rota")[0],
+                        22, config.AMARELO)
+
+        # banner do resultado do Desafio da Rota
+        if self._timer_rota > 0 and self.resultado_rota:
+            r = self.resultado_rota
+            fg = self.recursos.fonte(26)
+            painel = pygame.Rect(config.LARGURA // 2 - 130, 40, 260, 70)
+            comum.painel(tela, painel)
+            comum.faixa_titulo(tela, fg, "ROTA COMPLETA", painel.centerx, painel.top + 2)
+            # tres estrelas (runa) - acesas conforme o desempenho
+            estrela = pygame.transform.scale(self.recursos.sprite_runa(), (14, 14))
+            apagada = estrela.copy()
+            apagada.fill((70, 70, 70, 255), special_flags=pygame.BLEND_RGBA_MULT)
+            for i in range(3):
+                img = estrela if i < r["estrelas"] else apagada
+                tela.blit(img, (painel.centerx - 23 + i * 16, painel.top + 20))
+            comum.texto(tela, fonte, f"Eficiencia {int(r['eff'] * 100)}%   +{r['bonus']} ouro",
+                        painel.centerx, painel.top + 44, config.BRANCO, centro=True)
+            comum.texto(tela, fonte, f"sua rota {r['meu']:.0f}  |  otima {r['otimo']:.0f}",
+                        painel.centerx, painel.top + 58, config.CINZA, centro=True)
 
     def _pedir_luzes(self, agora):
         luz = self.luzes
@@ -776,6 +864,10 @@ class Fase(Estado):
             if it.material.chave == "cristal":
                 pulso = 24 + math.sin(agora * 3.0 + it.rect.x) * 5
                 luz.adicionar(it.rect.centerx, it.rect.centery, pulso, (185, 130, 235))
+        for runa in self.runas:
+            if not runa.coletada:
+                pulso = 22 + math.sin(agora * 4.0 + runa.rect.x) * 5
+                luz.adicionar(runa.rect.centerx, runa.rect.centery, pulso, (255, 215, 120))
 
     def _desenhar_vagalumes(self, tela, agora):
         for v in self.vagalumes:

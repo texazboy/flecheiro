@@ -68,6 +68,9 @@ recheado de mecânicas:
   que dispara uma investida quando te vê.
 - **Combo de abates:** derrotar inimigos em sequência aumenta o combo e chove
   mais moeda.
+- **Desafio da Rota (TSP):** runas douradas espalhadas pela fase; coletá-las na
+  melhor ordem rende eficiência alta, **★★★** e bônus de ouro — o `T` mostra a
+  rota ótima pra você planejar. O total de estrelas aparece na vitória.
 - Derrotar inimigos solta **moedas** (coleta automática, com efeito ímã);
   **baús de tesouro** nos pontos altos guardam materiais raros; e **placas**
   pelo caminho dão dicas (leia com `E`).
@@ -79,7 +82,7 @@ arquivos de áudio).
 
 | Algoritmo | Onde está no jogo | Arquivo |
 |-----------|-------------------|---------|
-| **TSP** (Held-Karp exato + heurística 2-opt) | overlay `T` mostra a menor rota para coletar todos os itens da fase e voltar | [`algoritmos/tsp.py`](algoritmos/tsp.py) |
+| **TSP** (Held-Karp exato + heurística 2-opt) | **Desafio da Rota**: colete as runas douradas; o jogo compara a ordem que você fez com a rota ótima e dá eficiência %, estrelas e bônus de ouro (`T` mostra a rota ótima) | [`algoritmos/tsp.py`](algoritmos/tsp.py) |
 | **Mochila 0/1** (programação dinâmica) | ferraria: escolhe os melhores materiais dentro da capacidade da bigorna para forjar o arco | [`algoritmos/mochila.py`](algoritmos/mochila.py) |
 | **Quicksort** | ordenação do inventário por valor / peso / raridade | [`algoritmos/ordenacao.py`](algoritmos/ordenacao.py) |
 

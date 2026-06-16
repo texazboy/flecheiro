@@ -54,3 +54,5 @@ class Mundo:
         self.abatidos = 0
         self.coletados = 0
         self.tempo = 0.0
+        # Desafio da Rota (TSP): estrelas somadas nas fases (max 3 por fase)
+        self.estrelas_rota = 0

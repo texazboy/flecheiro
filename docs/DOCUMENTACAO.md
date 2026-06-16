@@ -9,10 +9,16 @@ dependência do pygame, o que permite testá-los direto no terminal.
 
 ## 1. Problema do Caixeiro Viajante (TSP) — requisito 2.1
 
-**Onde aparece:** na fase de ação, a tecla `T` liga um overlay que desenha a
-**menor rota** para o jogador recolher todos os itens espalhados e voltar ao
-ponto de partida. É exatamente o exemplo citado no enunciado ("rota ótima de
-coleta").
+**Onde aparece:** o TSP é a base do **Desafio da Rota**, uma mecânica de
+pontuação. Cada fase tem runas douradas espalhadas; a tecla `T` desenha a
+**menor rota** que passa por todas e volta ao ponto de partida (o exemplo
+citado no enunciado, "rota ótima de coleta"). O algoritmo, porém, não é só
+visual: o jogo **registra a ordem em que o jogador realmente coletou** as runas
+e, ao final, compara o custo dessa rota com o custo ótimo retornado pelo TSP. A
+razão `custo_ótimo / custo_jogador` vira uma **eficiência (%)** que rende de 1 a
+3 estrelas e bônus de ouro. Assim o jogador é recompensado por planejar a rota,
+e o valor do algoritmo fica evidente em jogo (a rota ótima quase sempre é bem
+mais curta que a ingênua).
 
 **Por que TSP é interessante:** é um problema **NP-difícil**. Não se conhece
 algoritmo de tempo polinomial que resolva o caso geral, então ele é perfeito

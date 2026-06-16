@@ -163,7 +163,7 @@ class VitoriaState(Estado):
         linhas = [
             f"Tempo de jornada: {minutos}m {segundos:02d}s",
             f"Inimigos vencidos: {m.abatidos}    Itens coletados: {m.coletados}",
-            f"Arcos forjados: {m.arcos_forjados}    Ouro: {m.ouro}",
+            f"Estrelas de rota (TSP): {m.estrelas_rota}/9    Ouro: {m.ouro}",
         ]
         y = painel.top + 20
         for linha in linhas:

@@ -43,6 +43,35 @@ MATERIAIS = {
 TABELA_DROPS = ["madeira", "pena", "couro", "ferro", "cristal"]
 
 
+class Runa:
+    """Runa dourada do Desafio da Rota (TSP). Coletada ao encostar; o jogo
+    registra a ORDEM da coleta pra comparar com a rota otima."""
+
+    def __init__(self, x, y, recursos):
+        self.sprite = recursos.sprite_runa()
+        self.rect = self.sprite.get_rect(center=(int(x), int(y)))
+        self.base = (int(x), int(y))
+        self.tempo = random.uniform(0, 6.28)
+        self.coletada = False
+
+    @property
+    def centro(self):
+        return self.base   # posicao fixa (referencia da rota)
+
+    def atualizar(self, dt):
+        self.tempo += dt
+        self.rect.centery = int(self.base[1] + math.sin(self.tempo * 3.0) * 2.5)
+
+    def desenhar(self, tela, camera):
+        p = camera.aplicar(self.rect)
+        brilho = (math.sin(self.tempo * 4.0) + 1) / 2
+        raio = 9 + int(brilho * 3)
+        halo = pygame.Surface((raio * 2, raio * 2), pygame.SRCALPHA)
+        pygame.draw.circle(halo, (255, 220, 120, 70), (raio, raio), raio)
+        tela.blit(halo, (p.centerx - raio, p.centery - raio))
+        tela.blit(self.sprite, p)
+
+
 class Moeda:
     """Moedinha fisica: pula, quica no chao e voa pro jogador quando ele
     chega perto (efeito ima). Coleta automatica no toque."""

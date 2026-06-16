@@ -35,6 +35,7 @@ SPRITES SIMPLES (1 quadro)
   bau_aberto.png       bau de tesouro aberto
   moeda.png            moedinha (~7px)
   placa.png            placa de aviso (~16px)
+  runa.png             runa do Desafio da Rota / TSP (~13px, estrela dourada)
 
 ANIMACOES (spritesheet = tira HORIZONTAL de quadros)
 ----------------------------------------------------
