@@ -68,31 +68,39 @@ class Fundo:
         self.nome_tema = tema
         rnd = random.Random(semente * 31 + 7)
         self.ceu = self._montar_ceu(rnd)
-        self.img_extra = recursos.fundo_img()   # fundo.png do usuario, se houver
-        # camadas de montanha: (surface, fator de parallax). As distantes vao
-        # desfocadas (profundidade de campo, estilo HD-2D).
-        fatores = (0.22, 0.42, 0.65)
-        bases = (148, 172, 198)
-        amps = (24, 18, 12)
-        borroes = (3, 2, 1)
-        self.camadas = []
-        for cor, fator, base, amp, borrao in zip(self.tema["camadas"], fatores,
-                                                 bases, amps, borroes):
-            img = self._montar_morros(cor, base, amp, rnd)
-            if borrao > 1:
-                img = _borrar(img, borrao)
-            self.camadas.append((img, fator))
-        self.nuvens = self._montar_nuvens(rnd) if self.tema["nuvens"] else []
-        self.raios = self._montar_raios() if tema == "dia" else None
+        self.sol_img = recursos.sprite_opcional("sol") if tema == "dia" else None
 
-        # se o usuario colocou camadas de parallax de verdade (fundo1..3.png),
-        # elas entram no lugar das montanhas procedurais
-        externas = recursos.fundo_camadas()
+        # camadas de parallax pintadas do tema (Gandalf) tem prioridade;
+        # senao caem nas montanhas procedurais.
+        externas = recursos.fundo_camadas(tema)
         if externas:
-            fatores_ext = (0.2, 0.45, 0.7)
-            self.camadas = [(img, fatores_ext[min(i, 2)])
-                            for i, img in enumerate(externas)]
+            # nos arquivos, layer 1 = mais perto e 5 = mais longe (ceu);
+            # invertendo, desenhamos do mais distante pro mais proximo
+            externas = externas[::-1]
+            fatores = [0.05, 0.16, 0.30, 0.5, 0.74][:len(externas)]
+            self.camadas = list(zip(externas, fatores))
+            self.externo = True
+        else:
+            fatores = (0.22, 0.42, 0.65)
+            bases = (148, 172, 198)
+            amps = (24, 18, 12)
+            borroes = (3, 2, 1)
+            self.camadas = []
+            for cor, fator, base, amp, borrao in zip(self.tema["camadas"], fatores,
+                                                     bases, amps, borroes):
+                img = self._montar_morros(cor, base, amp, rnd)
+                if borrao > 1:
+                    img = _borrar(img, borrao)
+                self.camadas.append((img, fator))
+            self.externo = False
+
+        # nuvens: usa os sprites de nuvem se houver, senao desenha
+        self.nuvem_imgs = recursos.nuvens()
+        if self.nuvem_imgs or self.tema["nuvens"] or self.externo:
+            self.nuvens = self._montar_nuvens(rnd)
+        else:
             self.nuvens = []
+        self.raios = self._montar_raios() if tema == "dia" else None
 
     # ------------------------------------------------------------ construcao
     def _montar_ceu(self, rnd):
@@ -163,17 +171,20 @@ class Fundo:
 
     def _montar_nuvens(self, rnd):
         nuvens = []
-        cor = self.tema["cor_nuvem"]
         for _ in range(5):
-            larg = rnd.randint(36, 64)
-            alt = rnd.randint(10, 16)
-            s = pygame.Surface((larg, alt), pygame.SRCALPHA)
-            for _ in range(4):
-                rx = rnd.randint(0, larg - 18)
-                ry = rnd.randint(0, alt - 8)
-                pygame.draw.ellipse(s, (cor[0], cor[1], cor[2], 80), (rx, ry, 18, 9))
-            nuvens.append(dict(img=s, x=rnd.uniform(0, config.LARGURA),
-                               y=rnd.randint(18, 90), vel=rnd.uniform(2.0, 5.0)))
+            if self.nuvem_imgs:
+                img = rnd.choice(self.nuvem_imgs)
+            else:
+                cor = self.tema["cor_nuvem"]
+                larg = rnd.randint(36, 64)
+                alt = rnd.randint(10, 16)
+                img = pygame.Surface((larg, alt), pygame.SRCALPHA)
+                for _ in range(4):
+                    rx = rnd.randint(0, larg - 18)
+                    ry = rnd.randint(0, alt - 8)
+                    pygame.draw.ellipse(img, (cor[0], cor[1], cor[2], 80), (rx, ry, 18, 9))
+            nuvens.append(dict(img=img, x=rnd.uniform(0, config.LARGURA),
+                               y=rnd.randint(10, 80), vel=rnd.uniform(2.0, 5.0)))
         return nuvens
 
     # ------------------------------------------------------------ por frame
@@ -181,40 +192,49 @@ class Fundo:
         tela.blit(self.ceu, (0, 0))
         agora = pygame.time.get_ticks() * 0.001
 
+        # camada 0 = mais distante (ceu pintado), vem logo apos o ceu base
+        if self.camadas:
+            self._camada(tela, self.camadas[0][0], offset_x * self.camadas[0][1])
+
+        # sol pintado (sprite) por cima do ceu, so de dia
+        if self.sol_img is not None:
+            tela.blit(self.sol_img, (config.LARGURA - 70, 26))
+
         for nuvem in self.nuvens:
-            faixa = config.LARGURA + 90
-            x = (nuvem["x"] + agora * nuvem["vel"] - offset_x * 0.12) % faixa - 80
+            faixa = config.LARGURA + 120
+            x = (nuvem["x"] + agora * nuvem["vel"] - offset_x * 0.12) % faixa - 100
             tela.blit(nuvem["img"], (int(x), nuvem["y"]))
 
-        if self.img_extra is not None:
-            larg = self.img_extra.get_width()
-            dx = -int(offset_x * 0.3) % larg
-            y = config.ALTURA - self.img_extra.get_height()
-            tela.blit(self.img_extra, (dx - larg, y))
-            tela.blit(self.img_extra, (dx, y))
-
-        for img, fator in self.camadas:
-            larg = img.get_width()
-            dx = -int(offset_x * fator) % larg
-            tela.blit(img, (dx - larg, 0))
-            if dx < config.LARGURA:
-                tela.blit(img, (dx, 0))
+        for img, fator in self.camadas[1:]:
+            self._camada(tela, img, offset_x * fator)
 
         if self.raios is not None:
             balanco = int(math.sin(agora * 0.25) * 5)
             tela.blit(self.raios, (balanco, 0), special_flags=pygame.BLEND_RGB_ADD)
+
+    @staticmethod
+    def _camada(tela, img, deslocamento):
+        larg = img.get_width()
+        dx = -int(deslocamento) % larg
+        tela.blit(img, (dx - larg, 0))
+        if dx < config.LARGURA:
+            tela.blit(img, (dx, 0))
 
 
 # ---------------------------------------------------------------------------
 # Terreno: a fase inteira (chao + plataformas + decoracao) numa superficie so.
 # ---------------------------------------------------------------------------
 def _arvore(sup, x, base_y, rnd, recursos=None):
-    """Arvore de copa redonda em tres tons, com contorno (fica atras do jogo).
-    Se existir arvore.png em assets/, usa ela no lugar."""
+    """Arvore de copa redonda em tres tons (procedural). Se houver arvores em
+    assets/ (arvore1.png...), sorteia uma delas no lugar."""
     if recursos is not None:
-        img = recursos.sprite_opcional("arvore", rnd.choice((56, 68, 80)))
-        if img is not None:
-            sup.blit(img, (x - img.get_width() // 2, base_y - img.get_height()))
+        lista = recursos.arvores()
+        if lista:
+            base = rnd.choice(lista)
+            alt = rnd.randint(70, 104)
+            larg = max(1, round(base.get_width() * alt / base.get_height()))
+            img = pygame.transform.scale(base, (larg, alt))
+            sup.blit(img, (x - larg // 2, base_y - alt + 2))
             return
     alt = rnd.randint(40, 58)
     topo = base_y - alt

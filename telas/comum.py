@@ -30,6 +30,11 @@ _cache_texto = {}
 # sem suavizacao. Definido pelo main na inicializacao.
 ANTIALIAS = True
 
+# botao do Cryo's Mini GUI usado como fundo dos keycaps (se carregado). O main
+# preenche na inicializacao; None = desenha o keycap dourado procedural.
+IMG_BOTAO = None
+_cache_botao = {}
+
 
 def _render(fonte, msg, cor):
     chave = (id(fonte), msg, cor)
@@ -114,17 +119,30 @@ def faixa_titulo(tela, fonte, msg, cx, y, cor=OURO_CLARO):
 
 
 def keycap(tela, fonte, tecla_txt, x, y, ativa=False):
-    """Botaozinho dourado com o nome da tecla. Devolve o rect."""
+    """Botaozinho com o nome da tecla. Usa o botao do Cryo's Mini GUI se houver,
+    senao desenha um dourado. Devolve o rect."""
     w = fonte.size(tecla_txt)[0] + 9
     h = 13
     r = pygame.Rect(x, y, w, h)
-    pygame.draw.rect(tela, CONTORNO, r.move(0, 1), border_radius=4)
-    cor_corpo = OURO_CLARO if ativa else OURO
-    pygame.draw.rect(tela, cor_corpo, r, border_radius=4)
-    clara = (255, 232, 170) if ativa else OURO_CLARO
-    pygame.draw.line(tela, clara, (r.left + 2, r.top), (r.right - 3, r.top), 1)
-    pygame.draw.rect(tela, CONTORNO, r, width=1, border_radius=4)
-    img = _render(fonte, tecla_txt, (46, 32, 16))
+    if IMG_BOTAO is not None:
+        chave = (w, h, ativa)
+        img_b = _cache_botao.get(chave)
+        if img_b is None:
+            img_b = pygame.transform.scale(IMG_BOTAO, (w, h))
+            if ativa:
+                img_b = img_b.copy()
+                img_b.fill((40, 40, 30), special_flags=pygame.BLEND_RGB_ADD)
+            _cache_botao[chave] = img_b
+        tela.blit(img_b, r.topleft)
+        cor_txt = (60, 44, 26)
+    else:
+        pygame.draw.rect(tela, CONTORNO, r.move(0, 1), border_radius=4)
+        pygame.draw.rect(tela, OURO_CLARO if ativa else OURO, r, border_radius=4)
+        clara = (255, 232, 170) if ativa else OURO_CLARO
+        pygame.draw.line(tela, clara, (r.left + 2, r.top), (r.right - 3, r.top), 1)
+        pygame.draw.rect(tela, CONTORNO, r, width=1, border_radius=4)
+        cor_txt = (46, 32, 16)
+    img = _render(fonte, tecla_txt, cor_txt)
     tela.blit(img, (r.centerx - img.get_width() // 2,
                     r.centery - img.get_height() // 2))
     return r

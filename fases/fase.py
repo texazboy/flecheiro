@@ -28,6 +28,7 @@ from entidades.jogador import Jogador
 from entidades.inimigo import Inimigo, InimigoVoador, InimigoCorredor
 from entidades.item import ItemNoChao, Moeda, Bau, MATERIAIS
 from entidades.plataformas import PlataformaMovel, PlataformaFragil
+from entidades.fogueira import Fogueira
 from entidades.efeitos import explosao, faisca, poeira, Onda, TextoFlutuante
 from telas.hud import HUD
 from telas.tela_inventario import TelaInventario
@@ -128,9 +129,11 @@ def _layout(numero):
         dica = "Noite fechada: cuidado com os vaos - a flecha fincada vira ponte!"
 
     porta = pygame.Rect(largura - 80, chao_y - 60, 24, 60)
+    fogueira_x = {1: 850, 2: 900, 3: 660}[numero]   # checkpoint no meio do caminho
     return dict(largura=largura, solidos=solidos, plataformas=plataformas,
                 moveis=moveis, frageis=frageis, inimigos=inimigos, itens=itens,
-                baus=baus, placas=placas, porta=porta, chao_y=chao_y, dica=dica)
+                baus=baus, placas=placas, porta=porta, chao_y=chao_y, dica=dica,
+                fogueira_x=fogueira_x)
 
 
 class Fase(Estado):
@@ -160,10 +163,17 @@ class Fase(Estado):
                      for (x, y, conteudo) in dados["baus"]]
         self.placas = [(pygame.Rect(x - 10, self.chao_y - 18, 20, 18), txt)
                        for (x, txt) in dados["placas"]]
+        self.fogueira = Fogueira(dados["fogueira_x"], self.chao_y, self.recursos)
+        self.checkpoint = self.pos_inicial      # onde renasce ao cair num vao
         self.moedas = []
         self.flechas = []
         self.particulas = []
         self.textos = []
+
+        # portal animado de saida (se houver o sprite); senao a porta roxa
+        self.portal_anim = self.recursos.animacao("portal", "gira", 60, fps=12)
+        self.tem_portal = len(self.portal_anim.quadros) > 1
+        self.passaro_img = self.recursos.sprite_opcional("passaro1")
 
         self.camera = Camera(config.LARGURA, config.ALTURA, self.largura_mundo)
         self.hud = HUD(self.mundo, self.recursos)
@@ -422,6 +432,25 @@ class Fase(Estado):
         for it in self.itens:
             it.atualizar(dt)
 
+        # fogueira-checkpoint: acende, vira ponto de renascimento e cura 1 coracao
+        self.fogueira.atualizar(dt)
+        if self.tem_portal:
+            self.portal_anim.atualizar(dt)
+        if not self.fogueira.ativada and self.fogueira.perto_de(self.jogador.rect):
+            self.fogueira.ativada = True
+            self.checkpoint = (self.fogueira.rect.centerx - 8, self.chao_y - 24)
+            self.particulas += explosao(self.fogueira.rect.centerx,
+                                        self.fogueira.rect.centery, config.LARANJA, 10)
+            self.textos.append(TextoFlutuante(self.fogueira.rect.centerx,
+                               self.fogueira.rect.top - 6, "Checkpoint!",
+                               config.AMARELO, self.recursos))
+            if not self.fogueira.curou and self.mundo.vida < self.mundo.vida_max:
+                self.mundo.vida += 1
+                self.fogueira.curou = True
+                som.tocar("cura")
+            else:
+                som.tocar("porta")
+
         # moedas: fisica + ima + coleta automatica
         for m in self.moedas:
             m.atualizar(dt, self, self.jogador)
@@ -620,7 +649,7 @@ class Fase(Estado):
     def _checar_queda(self):
         if self.jogador.rect.top > self.altura_mundo + 40:
             self.jogador.levar_dano(self.mundo, 1)
-            self.jogador.rect.topleft = self.pos_inicial
+            self.jogador.rect.topleft = self.checkpoint   # volta ao ultimo checkpoint
             self.jogador.vy = 0
             self.camera.sacudir(5)
 
@@ -653,14 +682,18 @@ class Fase(Estado):
         for f in self.frageis:
             f.desenhar(tela, self.camera, tile_plat)
 
-        # porta de saida com brilho pulsante
+        # saida: portal animado (se houver) ou a porta roxa, com brilho pulsante
         porta = self.camera.aplicar(self.porta)
         pulso = 120 + int(60 * math.sin(agora * 4.0))
         self.brilho_porta.set_alpha(pulso)
         tela.blit(self.brilho_porta, (porta.centerx - 36, porta.centery - 44))
-        pygame.draw.rect(tela, config.ROXO, porta)
-        pygame.draw.rect(tela, config.AMARELO, porta, 1)
-        pygame.draw.circle(tela, (210, 170, 240), porta.center, 5, 1)
+        if self.tem_portal:
+            q = self.portal_anim.quadro()
+            tela.blit(q, q.get_rect(midbottom=(porta.centerx, porta.bottom + 2)))
+        else:
+            pygame.draw.rect(tela, config.ROXO, porta)
+            pygame.draw.rect(tela, config.AMARELO, porta, 1)
+            pygame.draw.circle(tela, (210, 170, 240), porta.center, 5, 1)
 
         for f in self.folhas:
             px, py = self.camera.aplicar_ponto((f["x"], f["y"]))
@@ -676,6 +709,8 @@ class Fase(Estado):
         for bau in self.baus:
             self._sombra(tela, bau.rect)
 
+        self._sombra(tela, self.fogueira.rect)
+        self.fogueira.desenhar(tela, self.camera)
         for bau in self.baus:
             bau.desenhar(tela, self.camera)
         for it in self.itens:
@@ -728,6 +763,10 @@ class Fase(Estado):
         luz.adicionar(self.jogador.rect.centerx, self.jogador.rect.centery,
                       72, (255, 226, 185))
         luz.adicionar(self.porta.centerx, self.porta.centery, 56, (215, 160, 255))
+        if self.fogueira.ativada:
+            tremor = 40 + math.sin(agora * 12.0) * 6
+            luz.adicionar(self.fogueira.rect.centerx, self.fogueira.rect.centery,
+                          tremor, (255, 170, 90))
         for x, y, raio, cor in self.luzes_fixas:
             luz.adicionar(x, y, raio, cor)
         for tx, ty in self.tochas:
@@ -751,9 +790,11 @@ class Fase(Estado):
             tam = 2 if brilho > 0.75 else 1
             pygame.draw.rect(tela, (235, 235, 130), (int(px), int(py), tam, tam))
 
-    @staticmethod
-    def _desenhar_passaro(tela, passaro, agora):
+    def _desenhar_passaro(self, tela, passaro, agora):
         x, y = int(passaro["x"]), int(passaro["y"])
+        if self.passaro_img is not None:
+            tela.blit(self.passaro_img, (x - self.passaro_img.get_width() // 2, y))
+            return
         bater = math.sin(agora * 9.0 + passaro["x"] * 0.1) * 2
         cor = (52, 62, 76)
         pygame.draw.line(tela, cor, (x - 3, y - int(bater)), (x, y), 1)

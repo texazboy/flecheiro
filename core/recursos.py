@@ -148,17 +148,43 @@ class Recursos:
             self._cache_img["fundo"] = self._tentar_png("fundo")  # pode ser None
         return self._cache_img["fundo"]
 
-    def fundo_camadas(self):
-        """Camadas de parallax de verdade (fundo1.png, fundo2.png, fundo3.png).
-        Quando existem, substituem as montanhas procedurais."""
-        if "fundo_camadas" not in self._cache_img:
+    def fundo_camadas(self, tema):
+        """Camadas de parallax do tema (bg_<tema>_1..5.png). Quando existem,
+        substituem as montanhas procedurais."""
+        chave = "bgcam_" + tema
+        if chave not in self._cache_img:
             camadas = []
-            for i in (1, 2, 3):
-                img = self._tentar_png(f"fundo{i}")
+            for i in range(1, 6):
+                img = self._tentar_png(f"bg_{tema}_{i}")
                 if img is not None:
                     camadas.append(self._escalar_para_altura(img, config.ALTURA))
-            self._cache_img["fundo_camadas"] = camadas
-        return self._cache_img["fundo_camadas"]
+            self._cache_img[chave] = camadas
+        return self._cache_img[chave]
+
+    def arvores(self):
+        """Lista de arvores (arvore1.png, arvore2.png, ...) pra decorar as fases."""
+        if "arvores" not in self._cache_img:
+            lst = []
+            i = 1
+            while True:
+                img = self._tentar_png(f"arvore{i}")
+                if img is None:
+                    break
+                lst.append(img)
+                i += 1
+            self._cache_img["arvores"] = lst
+        return self._cache_img["arvores"]
+
+    def nuvens(self):
+        """Lista de nuvens (cloud1.png ...). Vazia se nao houver."""
+        if "nuvens" not in self._cache_img:
+            lst = []
+            for i in range(1, 7):
+                img = self._tentar_png(f"cloud{i}")
+                if img is not None:
+                    lst.append(img)
+            self._cache_img["nuvens"] = lst
+        return self._cache_img["nuvens"]
 
     def sprite_opcional(self, nome, altura=None):
         """Sprite que so existe se o usuario colocar o png (casa, poste, arvore,

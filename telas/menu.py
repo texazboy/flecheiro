@@ -53,6 +53,9 @@ class MenuState(Estado):
                 self.jogo.mundo = Mundo()          # comeca uma partida nova
                 from fases.fase import Fase
                 self.jogo.trocar_estado(Fase(self.jogo, 1))
+            elif evento.key == pygame.K_c:
+                som.tocar("clique")
+                self.jogo.trocar_estado(CreditosState(self.jogo))
             elif evento.key == pygame.K_ESCAPE:
                 self.jogo.rodando = False
 
@@ -98,8 +101,9 @@ class MenuState(Estado):
                              [("Esc", "pausa"), ("M", "som")],
                              painel.centerx, painel.top + 43)
 
-        comum.texto(tela, self.fonte_p, "ESC para sair", cx,
-                    config.ALTURA - 14, config.CINZA, centro=True)
+        r = comum.keycap(tela, self.fonte_p, "C", cx - 64, config.ALTURA - 20)
+        comum.texto(tela, self.fonte_p, "creditos", r.right + 4, config.ALTURA - 19, config.CINZA)
+        comum.texto(tela, self.fonte_p, "ESC sair", cx + 20, config.ALTURA - 19, config.CINZA)
 
 
 class VitoriaState(Estado):
@@ -207,3 +211,62 @@ class GameOverState(Estado):
         comum.legenda_teclas(tela, self.fonte,
                              [("R", "tentar de novo"), ("Esc", "menu")],
                              painel.centerx, painel.bottom - 28)
+
+
+class CreditosState(Estado):
+    """Tela de creditos, com os icones de redes sociais (Cryo's Mini GUI)."""
+
+    LINHAS = [
+        ("Flecheiro", config.AMARELO),
+        ("Codigo: Jose, Pedro, Matheus S. e Matheus V.", config.BRANCO),
+        ("", config.BRANCO),
+        ("Arte: LuizMelo, Pixel Frog, vnitti,", config.CINZA),
+        ("Cainos, GandalfHardcore e Cryo", config.CINZA),
+        ("Fonte: monogram (datagoblin)", config.CINZA),
+        ("Som e musica: gerados em codigo", config.CINZA),
+        ("Feito com Python + pygame-ce", config.CINZA),
+    ]
+
+    def __init__(self, jogo):
+        super().__init__(jogo)
+        self.fonte = jogo.recursos.fonte(24)
+        self.fonte_p = jogo.recursos.fonte(16)
+        self.fundo = Fundo(jogo.recursos, "noite", semente=4)
+        self.socials = jogo.recursos.sprite_opcional("socials")   # grade 16x16
+        self.tempo = 0.0
+
+    def entrar(self):
+        som.musica("menu")
+
+    def tratar_evento(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            self.jogo.trocar_estado(MenuState(self.jogo))
+
+    def atualizar(self, dt):
+        self.tempo += dt
+
+    def desenhar(self, tela):
+        self.fundo.desenhar(tela, self.tempo * 8)
+        comum.escurecer(tela, 120)
+        painel = pygame.Rect(60, 28, config.LARGURA - 120, config.ALTURA - 56)
+        comum.painel(tela, painel)
+        comum.faixa_titulo(tela, self.fonte, "CREDITOS", painel.centerx, painel.top + 2)
+
+        y = painel.top + 26
+        for txt, cor in self.LINHAS:
+            if txt:
+                comum.texto(tela, self.fonte_p, txt, painel.centerx, y, cor, centro=True)
+            y += 16
+
+        # fileira de icones sociais (decorativa) recortada da grade 16x16
+        if self.socials is not None:
+            n = 8
+            larg = n * 18
+            ix = painel.centerx - larg // 2
+            iy = painel.bottom - 40
+            for i in range(n):
+                icone = self.socials.subsurface((i * 16, 0, 16, 16))
+                tela.blit(icone, (ix + i * 18, iy))
+
+        comum.legenda_teclas(tela, self.fonte_p, [("Esc", "voltar")],
+                             painel.centerx, painel.bottom - 18)

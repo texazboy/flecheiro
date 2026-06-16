@@ -150,14 +150,17 @@ e cite a fonte nos créditos.
 ## Créditos
 
 - Código: os quatro integrantes acima.
-- Arte (todos pacotes gratuitos):
+- Arte (todos pacotes gratuitos / uso livre em jogos):
   - Personagem **Huntress** — *LuizMelo* (CC0) — [itch.io](https://luizmelo.itch.io/huntress)
-  - Inimigos (slime e morcego) — pacote *Monsters Creatures Fantasy 2* (gratuito)
-  - Baú e moedas — **Treasure Hunters**, *Pixel Frog* (CC0) — [itch.io](https://pixelfrog-assets.itch.io/treasure-hunters)
-  - Cenário de fundo — **Grassy Mountains**, *vnitti* — [itch.io](https://vnitti.itch.io/grassy-mountains-parallax-background)
-  - Props da vila (árvore, poço, poste, banco...) — **Village Props**, *Cainos* — [itch.io](https://cainos.itch.io/pixel-art-platformer-village-props)
-  - Rato corredor — *Monsters Creatures Fantasy* (gratuito)
-  - Fonte **monogram** — *datagoblin* (CC0) — [itch.io](https://datagoblin.itch.io/monogram)
-- O que não vem de pacote (NPCs, itens, tiles, interface, plataformas) é
+  - Inimigos (slime, morcego, rato) — *Monsters Creatures Fantasy* — *LuizMelo*
+  - Baú e moedas — **Treasure Hunters**, *Pixel Frog* (CC0)
+  - **Fundos parallax** (dia/poente/noite), árvores, nuvens, sol, portal,
+    fogueira — *GandalfHardcore FREE Platformer Assets*
+  - **NPCs da vila** (montados de pele/cabelo/roupa) — *GandalfHardcore Character Pack*
+  - **Barra de vida** da HUD — *GandalfHardcore Hp bar*
+  - Props da vila (poço, poste, banco...) — **Village Props**, *Cainos*
+  - **Interface** (botões dos keycaps) e ícones sociais — *Cryo's Mini GUI*
+  - Fonte **monogram** — *datagoblin* (CC0)
+- O que não vem de pacote (itens, tiles do chão, painéis, plataformas) é
   desenhado proceduralmente pelo próprio jogo.
 - Feito com [pygame-ce](https://pyga.me/).

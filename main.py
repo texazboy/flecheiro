@@ -41,10 +41,12 @@ class Jogo:
 
         pasta_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
         self.recursos = Recursos(pasta_assets)
-        # fonte pixel (monogram) renderiza melhor sem suavizacao
+        # fonte pixel (monogram) renderiza melhor sem suavizacao; e o botao do
+        # Cryo's Mini GUI vira o fundo dos keycaps
+        from telas import comum
         if self.recursos.fonte_pixel:
-            from telas import comum
             comum.ANTIALIAS = False
+        comum.IMG_BOTAO = self.recursos.sprite_opcional("botao")
         self.mundo = Mundo()
 
         self.vinheta = self._montar_vinheta()

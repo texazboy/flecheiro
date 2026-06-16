@@ -65,6 +65,10 @@ class HUD:
         self.faixa_dica = self._fazer_faixa_dica()
         self.alerta_vida = self._fazer_alerta_vida()
         self._placas_local = {}   # cache das placas do canto direito
+        # barra de HP ornamentada (GandalfHardcore) se existir
+        self.hpframe = recursos.sprite_opcional("hpbar")   # 116x64
+        if self.hpframe is not None:
+            self.placa_dados = self._fazer_placa(86, 30)   # ouro + arco ao lado
 
     # ------------------------------------------------------------- pecas
     @staticmethod
@@ -114,6 +118,31 @@ class HUD:
         pygame.draw.polygon(tela, (210, 210, 220),
                             [(x + 5, y + 3), (x + 7, y + 4), (x + 5, y + 5)])
 
+    def _desenhar_hpframe(self, tela, agora, vida_baixa):
+        """HUD com a barra ornamentada do GandalfHardcore: retrato (arco) +
+        barra de vida, e ouro/arco numa placa ao lado."""
+        tela.blit(self.hpframe, (2, 2))
+        # retrato: disco escuro + arco no circulo da esquerda
+        pygame.draw.circle(tela, (20, 18, 28), (2 + 31, 2 + 30), 22)
+        self._icone_arco(tela, 2 + 24, 2 + 24, self.mundo.arco.cor)
+        # barra de vida preenchendo o slot segmentado (canto inferior direito)
+        barra = pygame.Rect(2 + 60, 2 + 48, 49, 9)
+        pygame.draw.rect(tela, (34, 14, 14), barra)
+        frac = self.mundo.vida / self.mundo.vida_max
+        if frac > 0:
+            cor = (210, 64, 58)
+            if vida_baixa and math.sin(agora * 6.0) > 0.3:
+                cor = (255, 130, 120)
+            fill = pygame.Rect(barra.left, barra.top, int(barra.width * frac), barra.height)
+            pygame.draw.rect(tela, cor, fill)
+            pygame.draw.line(tela, (255, 150, 140), (fill.left, fill.top),
+                             (fill.right - 1, fill.top), 1)
+        # placa lateral com ouro + arco
+        tela.blit(self.placa_dados, (120, 6))
+        tela.blit(self.moeda, (126, 12))
+        comum.texto(tela, self.fonte, str(self.mundo.ouro), 138, 11, config.AMARELO)
+        comum.texto(tela, self.fonte, self.mundo.arco.nome, 126, 23, config.VERDE)
+
     # ------------------------------------------------------------- frame
     def desenhar(self, tela, dica="", local=""):
         agora = pygame.time.get_ticks() * 0.001
@@ -125,26 +154,23 @@ class HUD:
             self.alerta_vida.set_alpha(int(110 + 130 * pulso))
             tela.blit(self.alerta_vida, (0, 0))
 
-        tela.blit(self.placa, (3, 3))
-
-        # coracoes (o ultimo "bate" quando a vida esta no talo)
-        for i in range(self.mundo.vida_max):
-            if i < self.mundo.vida:
-                if vida_baixa and math.sin(agora * 6.0) > 0.3:
-                    img = self.coracao_claro
+        if self.hpframe is not None:
+            self._desenhar_hpframe(tela, agora, vida_baixa)
+        else:
+            tela.blit(self.placa, (3, 3))
+            for i in range(self.mundo.vida_max):
+                if i < self.mundo.vida:
+                    if vida_baixa and math.sin(agora * 6.0) > 0.3:
+                        img = self.coracao_claro
+                    else:
+                        img = self.coracao_cheio
                 else:
-                    img = self.coracao_cheio
-            else:
-                img = self.coracao_vazio
-            tela.blit(img, (9 + i * self._passo_coracao, 7))
-
-        # ouro
-        tela.blit(self.moeda, (9, 19))
-        comum.texto(tela, self.fonte, str(self.mundo.ouro), 21, 18, config.AMARELO)
-
-        # arco equipado
-        self._icone_arco(tela, 11, 31, self.mundo.arco.cor)
-        comum.texto(tela, self.fonte, self.mundo.arco.nome, 22, 31, config.VERDE)
+                    img = self.coracao_vazio
+                tela.blit(img, (9 + i * self._passo_coracao, 7))
+            tela.blit(self.moeda, (9, 19))
+            comum.texto(tela, self.fonte, str(self.mundo.ouro), 21, 18, config.AMARELO)
+            self._icone_arco(tela, 11, 31, self.mundo.arco.cor)
+            comum.texto(tela, self.fonte, self.mundo.arco.nome, 22, 31, config.VERDE)
 
         # canto direito: onde estamos + estado do som
         if local:
