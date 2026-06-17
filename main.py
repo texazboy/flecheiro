@@ -54,6 +54,11 @@ class Jogo:
         self._veu.fill(config.PRETO)
         self.fade = 0.0
 
+        # extras de qualidade de vida: tela cheia (F11) e contador de FPS (F3)
+        self.tela_cheia = False
+        self.mostrar_fps = False
+        self.fonte_fps = self.recursos.fonte(12)
+
         from telas.menu import MenuState
         self.estado = MenuState(self)
         self.estado.entrar()
@@ -81,6 +86,10 @@ class Jogo:
                     self.rodando = False
                 elif evento.type == pygame.KEYDOWN and evento.key == pygame.K_m:
                     som.alternar_mudo()
+                elif evento.type == pygame.KEYDOWN and evento.key == pygame.K_F11:
+                    self._alternar_tela_cheia()
+                elif evento.type == pygame.KEYDOWN and evento.key == pygame.K_F3:
+                    self.mostrar_fps = not self.mostrar_fps
                 else:
                     self.estado.tratar_evento(evento)
             self.estado.atualizar(dt)
@@ -90,11 +99,30 @@ class Jogo:
             self._apresentar()
         pygame.quit()
 
+    def _alternar_tela_cheia(self):
+        """F11: alterna entre janela e tela cheia. A apresentacao ja amplia a
+        superficie interna pro tamanho da janela, entao so trocamos o modo."""
+        self.tela_cheia = not self.tela_cheia
+        if self.tela_cheia:
+            self.janela = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            self.janela = pygame.display.set_mode((config.LARGURA_JANELA, config.ALTURA_JANELA))
+
+    def _desenhar_fps(self):
+        img = self.fonte_fps.render(str(int(self.clock.get_fps())) + " FPS", False,
+                                    config.AMARELO)
+        fundo = pygame.Surface((img.get_width() + 4, img.get_height() + 2), pygame.SRCALPHA)
+        fundo.fill((0, 0, 0, 140))
+        self.tela.blit(fundo, (2, 2))
+        self.tela.blit(img, (4, 3))
+
     def _apresentar(self):
         self.tela.blit(self.vinheta, (0, 0))
         if self.fade > 0:
             self._veu.set_alpha(int(255 * self.fade / DURACAO_FADE))
             self.tela.blit(self._veu, (0, 0))
+        if self.mostrar_fps:
+            self._desenhar_fps()
         pygame.transform.scale(self.tela, self.janela.get_size(), self.janela)
         pygame.display.flip()
 
