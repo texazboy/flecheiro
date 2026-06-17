@@ -30,9 +30,11 @@ class NPC:
     def desenhar(self, tela, camera, destacar=False):
         destino = camera.aplicar(self.rect)
         tela.blit(self.sprite, destino)
-        # nome em cima
-        comum.texto(tela, self._fonte, self.nome, destino.centerx, destino.top - 16,
+        # nome em cima, preso na tela pra nao cortar quando o NPC fica na borda
+        meia = self._fonte.size(self.nome)[0] // 2 + 4
+        nx = max(meia, min(destino.centerx, config.LARGURA - meia))
+        comum.texto(tela, self._fonte, self.nome, nx, destino.top - 16,
                     config.BRANCO, centro=True)
         if destacar:
-            comum.texto(tela, self._fonte, "[E]", destino.centerx, destino.top - 4,
+            comum.texto(tela, self._fonte, "[E]", nx, destino.top - 4,
                         config.AMARELO, centro=True)

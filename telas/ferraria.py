@@ -109,21 +109,26 @@ class Ferraria:
 
         # cartao da solucao otima (mochila 0/1) com a previa do arco
         y += 4
-        cartao = pygame.Rect(painel.left + 10, y, painel.width - 20, 48)
+        cartao = pygame.Rect(painel.left + 10, y, painel.width - 20, 42)
         comum.painel(tela, cartao, cor_fundo=(32, 46, 32), alpha=255)
         arco_previa = arco_por_qualidade(self.otima.valor) if self.otima.valor > 0 else self.mundo.arco
-        comum.texto(tela, self.fonte_p, "Mochila 0/1 (otima):", cartao.left + 8,
-                    cartao.top + 6, config.AMARELO)
+        # linha 1: rotulo + materiais escolhidos (resumo medido pra nao colar)
+        rotulo = "Mochila 0/1 (otima):"
+        comum.texto(tela, self.fonte_p, rotulo, cartao.left + 8, cartao.top + 6,
+                    config.AMARELO)
         comum.texto(tela, self.fonte_p, self._resumo(self.otima),
-                    cartao.left + 130, cartao.top + 6, config.BRANCO)
-        pygame.draw.rect(tela, arco_previa.cor, (cartao.left + 8, cartao.top + 22, 8, 8))
-        pygame.draw.rect(tela, config.PRETO, (cartao.left + 8, cartao.top + 22, 8, 8), 1)
+                    cartao.left + 8 + self.fonte_p.size(rotulo + " ")[0], cartao.top + 6,
+                    config.BRANCO)
+        # linha 2: amostra da cor do arco + qualidade -> arco resultante
+        pygame.draw.rect(tela, arco_previa.cor, (cartao.left + 8, cartao.top + 23, 8, 8))
+        pygame.draw.rect(tela, config.PRETO, (cartao.left + 8, cartao.top + 23, 8, 8), 1)
         comum.texto(tela, self.fonte_p,
                     f"qualidade {self.otima.valor}  ->  {arco_previa.nome} (dano {arco_previa.dano})",
-                    cartao.left + 22, cartao.top + 21, config.VERDE)
+                    cartao.left + 22, cartao.top + 22, config.VERDE)
+        # a comparacao com a gulosa fica ABAIXO do cartao (nao estoura a borda)
         comum.texto(tela, self.fonte_p,
                     f"gulosa daria: qualidade {self.gulosa.valor} (peso {self.gulosa.peso})",
-                    cartao.left + 8, cartao.top + 34, config.CINZA)
+                    cartao.left + 2, cartao.bottom + 5, config.CINZA)
 
         comum.texto(tela, self.fonte_p, self.mensagem, painel.centerx,
                     painel.bottom - 30, config.BRANCO, centro=True)

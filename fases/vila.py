@@ -130,10 +130,15 @@ class Vila(Estado):
         cx = npc.rect.centerx
         img = self.recursos.sprite_opcional("casa_" + npc.tipo, 158)
         if img is not None:
-            sup.blit(img, (cx - img.get_width() // 2, chao - img.get_height()))
-            self.chamines.append((cx + int(img.get_width() * 0.18),
-                                  chao - img.get_height() + 10))
-            self.luzes_fixas.append((cx, chao - 72, 64, (255, 205, 140)))
+            # corta a margem transparente: sem isso a casa "flutua" acima do
+            # chao quando o png tem espaco vazio em volta do desenho
+            recorte = img.get_bounding_rect()
+            if recorte.width > 0 and recorte.height > 0:
+                img = img.subsurface(recorte).copy()
+            alt = img.get_height()
+            sup.blit(img, (cx - img.get_width() // 2, chao - alt))
+            self.chamines.append((cx + int(img.get_width() * 0.18), chao - alt + 10))
+            self.luzes_fixas.append((cx, chao - alt // 2, 64, (255, 205, 140)))
             return
         self._casa_procedural(sup, cx, npc.tipo)
 
